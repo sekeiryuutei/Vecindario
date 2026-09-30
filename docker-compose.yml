@@ -44,7 +44,7 @@ services:
         aliases: [redis]
 
   vecindad_minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: vecindad_minio
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
@@ -67,7 +67,7 @@ services:
 
   # Crea el bucket privado una sola vez y termina.
   vecindad_minio_init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     container_name: vecindad_minio_init
     restart: "no"
     depends_on:

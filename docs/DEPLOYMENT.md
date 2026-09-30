@@ -9,6 +9,6 @@
 3. TLS: pon un proxy con HTTPS (Caddy/Traefik/Nginx con certificados) delante del puerto `NGINX_PORT`.
 4. Respaldos programados con `scripts/backup.sh` (cron) y copia fuera del servidor; prueba la restauración.
 5. `CORS_ALLOWED_ORIGINS` solo con los orígenes reales.
-6. Fija versiones de las imágenes `minio/minio` y `minio/mc` (hoy `latest`).
+6. Fija versiones de las imágenes `quay.io/minio/minio` y `quay.io/minio/mc` (hoy `latest`; MinIO ya no publica en Docker Hub).
 
 **Backups**: `pg_dump` incluye todos los schemas (público + cada copropiedad). No hay respaldo en la nube configurado.
