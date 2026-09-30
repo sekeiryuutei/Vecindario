@@ -1,0 +1,20 @@
+app:
+  env: test
+  mail:
+    dev-log-links: false
+  jwt:
+    secret: test-secret-test-secret-test-secret-test-secret-123456
+  security:
+    bcrypt-strength: 4
+    login-rate-limit-per-minute: 1000
+  seed:
+    enabled: false
+management:
+  health:
+    redis:
+      enabled: false
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

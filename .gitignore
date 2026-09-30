@@ -1,0 +1,28 @@
+# Secretos y entorno
+.env
+*.pem
+*.key
+
+# Dependencias y builds
+node_modules/
+target/
+dist/
+build/
+.angular/
+www/
+android/app/build/
+ios/App/Pods/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Logs y temporales
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# Backups locales de base de datos
+backups/
