@@ -11,4 +11,9 @@
     contraseña, recuperación de un solo uso, invitación/activación, roles inválidos, no auto-modificarse, permisos
     ajustados por copropiedad sin afectar a otra.
 
-Pendiente en fases siguientes: reglas de negocio de vehículos, reservas, pagos, conciliación y E2E Playwright.
+  - `VehicleAccessIT` (Fase 2a): vehículo dentro no se modifica ni elimina (admin ni residente) hasta registrar la salida; entrada duplicada,
+    vehículo bloqueado, placa desconocida y salida sin entrada se rechazan y generan alertas; **6 entradas simultáneas → exactamente 1**;
+    límites por tipo y por inmueble; placa única; el residente solo ve/toca lo suyo (404 en lo ajeno); el portero no ve personas;
+    personas, vehículos y eventos de un tenant son invisibles desde otro.
+
+Pendiente en fases siguientes: visitantes, reservas, pagos, conciliación y E2E Playwright.

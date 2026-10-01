@@ -17,6 +17,11 @@ public                        tenant_demo_norte            tenant_demo_sur
 5. Defensa en profundidad: los adaptadores de tenant llaman `TenantContext.require()` antes de tocar datos, y todo nombre
    de schema que llega a SQL dinámico pasa por `SchemaNames` (regex estricta `^tenant_[a-z][a-z0-9_]{2,39}$`).
 
+## Acceso a datos de tenant: JPA y JDBC
+- `properties` usa JPA/Hibernate (schema resuelto por `search_path`).
+- Fase 2a usa `TenantJdbc`: cada SQL lleva el marcador `{s}` que se reemplaza por el schema del tenant ACTIVO (`SchemaNames.quoted`).
+  Sin tenant en el contexto lanza `TENANT_NOT_SELECTED`. Ambos mecanismos leen el mismo `TenantContext`.
+
 ## Cambio de copropiedad
 `POST /api/v1/auth/select-tenant {tenantId}` → el backend valida la membresía, registra `LEFT`/`ENTERED` en
 `tenant_access_history`, guarda `last_tenant_id` y emite un token nuevo.

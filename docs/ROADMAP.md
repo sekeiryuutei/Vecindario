@@ -6,7 +6,8 @@ Cada fase se entrega como ZIP verificable. Las fases posteriores agregan migraci
 | Fase | Contenido | Estado |
 |---|---|---|
 | 1 | Infra Docker, multi-tenancy schema-per-tenant, Flyway, JWT + refresh, RBAC, auditoría, membresías con historial, super admin, inmuebles, Swagger, seed, tests de aislamiento | **Entregada (sin ejecutar)** |
-| 2 | Personas (N:N), propietarios/arrendatarios/residentes, parqueaderos, vehículos con regla "vehículo dentro", portería, visitantes/QR, paquetes, novedades | Pendiente |
+| 2a | Personas (N:N), propietarios/arrendatarios/residentes, parqueaderos, tipos y límites de vehículos, regla "vehículo dentro", entradas/salidas, alertas, vista del residente | **Entregada (sin ejecutar)** |
+| 2b | Visitantes con invitación/QR y autorización en tiempo real, paquetería, novedades de portería, reportes de seguridad | Pendiente |
 | 3 | Cartera, imputación configurable, pagos, conciliación bancaria (CSV/XLSX, matching con puntaje), Wompi, certificados | Pendiente |
 | 4 | Zonas comunes y reservas (concurrencia), PQRS/convivencia con SLA, notificaciones (email/push/WhatsApp), comunicados, documentos (S3/MinIO) | Pendiente |
 | 5 | Mantenimiento, proveedores, asambleas, presupuesto, reportes, cámaras/LPR (adapters), frontend Angular+Ionic+Capacitor+PWA, E2E Playwright, CI/CD | Pendiente |

@@ -2,11 +2,14 @@
 
 Desarrollada por **CodeVam**. Nombre y empresa visibles configurables (`APP_NAME`, `APP_COMPANY` en `.env`).
 
-> **Estado: Fase 1 de 5 (backend + infraestructura).**
+> **Estado: Fase 1 + Fase 2a de 5 (backend + infraestructura).**
 > Este ZIP incluye la base de la plataforma: multi-tenancy (un schema PostgreSQL por copropiedad), Flyway, JWT con refresh
 > rotativo, RBAC con permisos configurables por copropiedad, auditoría, gestión de usuarios/membresías con historial,
 > área de super admin, inmuebles (primer módulo de tenant), Swagger, seed, Docker, Nginx, PostgreSQL, Redis y MinIO.
-> **No incluye todavía**: personas/residentes, vehículos, portería, finanzas, PQRS, reservas, etc. (Fases 2 a 5) ni el frontend.
+> La **Fase 2a** agrega: personas, relaciones propietario/arrendatario/residente con inmuebles (N:N), tipos de vehículo y límites
+> configurables, vehículos con la regla "vehículo dentro", control de acceso vehicular de portería (entrada/salida atómicas),
+> alertas de seguridad y la vista del residente limitada a sus propios inmuebles.
+> **No incluye todavía**: visitantes/QR, paquetes y novedades (Fase 2b), finanzas, PQRS, reservas, etc. (Fases 3 a 5) ni el frontend.
 > Ver [docs/ROADMAP.md](docs/ROADMAP.md).
 >
 > **Importante:** este código fue escrito sin poder compilarlo ni ejecutarlo en el entorno donde se generó (sin Maven,
@@ -63,7 +66,7 @@ Con frontend (Fase 5): `docker compose --profile frontend up -d --build`.
 | Swagger UI | http://localhost:48124/swagger-ui.html |
 | Health | http://localhost:48124/actuator/health |
 
-Prueba rápida automática: `./scripts/smoke-test.sh`
+Prueba rápida automática: en **PowerShell** `.\scripts\smoke-test.ps1` (puede requerir `Set-ExecutionPolicy -Scope Process Bypass`); en Git Bash/WSL `./scripts/smoke-test.sh` (solo cubre la Fase 1).
 
 ## Usuarios demo (solo desarrollo; contraseña = `APP_SEED_PASSWORD`, por defecto `Demo#2026!`)
 
@@ -78,7 +81,19 @@ Prueba rápida automática: `./scripts/smoke-test.sh`
 | portero@demo-norte.local | PORTERO | Norte |
 | propietario@demo-norte.local | PROPIETARIO | Norte **y** Sur (misma persona en dos tenants) |
 
+Datos demo de la Fase 2a en *Conjunto Demo Norte*: Juan Pérez es propietario de 3 inmuebles (T1-101, T1-102, T2-101) y además de A-101 en *Demo Sur* (misma persona, mismo usuario); María Gómez es arrendataria de T1-101. Placas de prueba: `ABC123` (carro), `GHI789` (segundo carro de T1-101, permitido por una excepción de límite), `XYZ98A` (moto), `DEF456`.
+
 Empresa: *CodeVam Administración Demo*. Copropiedades: *Conjunto Demo Norte* y *Conjunto Demo Sur*.
+
+### Portería (ejemplo)
+
+```bash
+# con el token del portero (portero@demo-norte.local)
+curl -s "$BASE/access/vehicles/lookup?plate=ABC123" -H "Authorization: Bearer <token>"
+curl -s -X POST $BASE/access/entry -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' -d '{"plate":"ABC123"}'
+# ahora, modificar ese vehículo (admin) devuelve 409 VEHICLE_INSIDE hasta registrar la salida:
+curl -s -X POST $BASE/access/exit  -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' -d '{"plate":"ABC123"}'
+```
 
 ### Flujo con curl
 
