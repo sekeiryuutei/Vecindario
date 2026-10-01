@@ -43,7 +43,10 @@ services:
       vecindad_net:
         aliases: [redis]
 
+  # OPCIONAL (profile "storage"): MinIO ya no se distribuye en Docker Hub ni en Quay sin credenciales.
+  # El almacenamiento S3 no se usa hasta la fase de documentos; se elegirá entonces un servidor S3 compatible.
   vecindad_minio:
+    profiles: ["storage"]
     image: quay.io/minio/minio:latest
     container_name: vecindad_minio
     restart: unless-stopped
@@ -67,6 +70,7 @@ services:
 
   # Crea el bucket privado una sola vez y termina.
   vecindad_minio_init:
+    profiles: ["storage"]
     image: quay.io/minio/mc:latest
     container_name: vecindad_minio_init
     restart: "no"

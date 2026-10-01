@@ -7,6 +7,7 @@ import com.codevam.vecindad.identity.application.port.out.RolePermissionPort;
 import com.codevam.vecindad.identity.application.port.out.UserPort;
 import com.codevam.vecindad.shared.error.ErrorWriter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,7 +30,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwt, UserPort users,
                                                    MembershipPort memberships, RolePermissionPort rolePermissions,
-                                                   ObjectMapper mapper, CorsConfigurationSource cors) throws Exception {
+                                                   ObjectMapper mapper,
+                                                   @Qualifier("corsConfigurationSource") CorsConfigurationSource cors) throws Exception {
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwt, users, memberships, rolePermissions);
         http
                 .csrf(csrf -> csrf.disable()) // API stateless con Bearer token, sin cookies de sesión
@@ -61,7 +63,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
+    @Bean("corsConfigurationSource")
     public CorsConfigurationSource corsConfigurationSource(AppProperties props) {
         List<String> origins = props.security().corsAllowedOrigins() == null ? List.of()
                 : props.security().corsAllowedOrigins().stream().filter(s -> s != null && !s.isBlank()).toList();

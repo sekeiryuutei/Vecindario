@@ -43,10 +43,11 @@ cp .env.example .env
 
 ```bash
 docker compose up -d --build
-docker compose ps                       # todos "healthy" (minio_init termina solo)
+docker compose ps                       # postgresql, redis, backend y nginx "healthy"
 docker compose logs -f vecindad_backend # espera "Started VecindadApplication"
 ```
 
+MinIO es opcional (`--profile storage`) y hoy puede no descargarse (MinIO retiró sus imágenes públicas); no se usa hasta la fase de documentos.
 Con frontend (Fase 5): `docker compose --profile frontend up -d --build`.
 
 **PASO 8. Migraciones y seed: son automáticas.** Al arrancar el backend:
@@ -61,7 +62,6 @@ Con frontend (Fase 5): `docker compose --profile frontend up -d --build`.
 | API vía Nginx | http://localhost:48124/api/v1 |
 | Swagger UI | http://localhost:48124/swagger-ui.html |
 | Health | http://localhost:48124/actuator/health |
-| MinIO consola | http://localhost:48126 (usuario/clave de `.env`) |
 
 Prueba rápida automática: `./scripts/smoke-test.sh`
 
