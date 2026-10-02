@@ -14,6 +14,7 @@ function Call($method, $path, $token = $null, $body = $null) {
   $h = @{}; if ($token) { $h['Authorization'] = "Bearer $token" }
   $args = @{ Uri = "$base$path"; Method = $method; Headers = $h; UseBasicParsing = $true }
   if ($body) { $args['Body'] = ($body | ConvertTo-Json -Compress); $args['ContentType'] = 'application/json' }
+  elseif ($method -in 'POST', 'PUT', 'PATCH') { $args['Body'] = '{}'; $args['ContentType'] = 'application/json' }  # PowerShell enviaria form-urlencoded por defecto
   try { $r = Invoke-WebRequest @args; $status = [int]$r.StatusCode; $text = $r.Content }
   catch {
     if ($_.Exception.Response) {

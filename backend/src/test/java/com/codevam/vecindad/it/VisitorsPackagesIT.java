@@ -285,4 +285,12 @@ class VisitorsPackagesIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.openIncidents").value(0)).andExpect(jsonPath("$.vehiclesInside").value(0));
         send(get("/api/v1/security/summary"), s.ownerToken, null).andExpect(status().isForbidden());
     }
+
+    @Test
+    void postWithFormContentType_isA415_notA500() throws Exception {
+        Setup s = setup();
+        mvc.perform(post("/api/v1/my/visitors/requests/" + UUID.randomUUID() + "/authorize")
+                        .header("Authorization", bearer(s.ownerToken)).contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isUnsupportedMediaType()).andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
 }
