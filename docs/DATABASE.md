@@ -21,3 +21,8 @@ y `presence` INSIDE/OUTSIDE son conceptos separados) · `vehicle_access_events` 
 Acceso a datos: estas tablas se leen/escriben con `TenantJdbc`, que reemplaza `{s}` por el schema del tenant ACTIVO (validado). Las operaciones
 críticas son **una sola sentencia SQL** (CTE `UPDATE ... RETURNING` + `INSERT`), por lo que son atómicas frente a solicitudes simultáneas:
 entrada/salida de vehículos, modificación/eliminación solo si está fuera, e inserción solo si el inmueble está bajo su límite.
+
+## Fase 2b (schema de cada tenant, migración V3)
+`visitor_invitations` (QR guardado solo como hash SHA-256; `max_entries`/`used_count`) · `visits` (INVITATION/WALK_IN; PENDING_AUTH → AUTHORIZED|REJECTED → INSIDE → LEFT)
+· `packages` (RECEIVED/NOTIFIED/DELIVERED/RETURNED) · `incidents` (OPEN/IN_REVIEW/CLOSED). Alertas de visitantes (`INVALID_QR`, `VISITOR_EXPIRED`) reutilizan `security_alerts`.
+El ingreso por QR es una sola sentencia (CTE `UPDATE visitor_invitations ... RETURNING` + `INSERT visits`), atómica frente a lecturas simultáneas del mismo código.

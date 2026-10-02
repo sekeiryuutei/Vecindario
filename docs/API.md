@@ -36,3 +36,21 @@ Códigos de error frecuentes: `INVALID_CREDENTIALS` 401, `ACCOUNT_LOCKED` 423, `
 Errores nuevos: `VEHICLE_INSIDE` 409 (mensaje fijo: "Este vehículo se encuentra actualmente dentro de la copropiedad. Debe registrarse su salida antes de modificar su registro."),
 `VEHICLE_ALREADY_INSIDE` 409, `VEHICLE_NOT_INSIDE` 409, `VEHICLE_BLOCKED` 403, `VEHICLE_NOT_REGISTERED` 404, `VEHICLE_LIMIT_REACHED` 409,
 `PLATE_ALREADY_REGISTERED` 409, `DOCUMENT_ALREADY_EXISTS` 409, `PERSON_HAS_RELATIONS` 409, `RELATION_ALREADY_EXISTS` 409.
+
+## Fase 2b
+| Método y ruta | Permiso |
+|---|---|
+| POST `/my/visitors/invitations` (devuelve `qrToken` una sola vez) · POST `/my/visitors/invitations/{id}/cancel` · POST `…/{id}/regenerate-qr` | VISITORS_CREATE |
+| GET `/my/visitors/invitations` · GET `/my/visitors/requests` | VISITORS_VIEW_OWN |
+| POST `/my/visitors/requests/{id}/authorize` · `…/reject` | VISITORS_RESPOND_OWN |
+| POST `/visitors/validate-qr` · `/visitors/check-in-qr` · `/visitors/walk-in` · `/visitors/visits/{id}/check-in` · `…/check-out` | VISITORS_AUTHORIZE |
+| GET `/visitors/visits` · GET `/visitors/invitations` | VISITORS_VIEW |
+| POST/GET `/packages` · GET `/packages/{id}` · POST `/packages/{id}/deliver` · `…/return` | PACKAGES_MANAGE / PACKAGES_VIEW |
+| GET `/my/packages` | PACKAGES_VIEW_OWN |
+| POST/GET `/incidents` · GET `/incidents/{id}` · PATCH `/incidents/{id}/status` · PUT `/incidents/{id}/assignee` | INCIDENTS_CREATE / INCIDENTS_VIEW / INCIDENTS_MANAGE |
+| GET `/security/summary` | SECURITY_SUMMARY_VIEW |
+
+Códigos nuevos: `INVALID_QR` 404, `QR_ALREADY_USED` / `QR_EXPIRED` / `QR_NOT_YET_VALID` / `QR_CANCELLED` 409, `VISIT_PENDING_AUTH` 409,
+`VISIT_REJECTED` 403, `VISIT_ALREADY_DECIDED` 409, `VISIT_NOT_INSIDE` 409, `PARCEL_NOT_PENDING` 409, `RESOLUTION_REQUIRED` 400, `USER_NOT_MEMBER` 409.
+
+Flujo sin invitación: portero `POST /visitors/walk-in` → residente ve `GET /my/visitors/requests?status=PENDING_AUTH` → `authorize|reject` → portero `check-in` (solo si AUTHORIZED).

@@ -24,6 +24,7 @@ function Call($method, $path, $token = $null, $body = $null) {
   $json = $null; if ($text) { try { $json = $text | ConvertFrom-Json } catch {} }
   return [pscustomobject]@{ Status = $status; Json = $json }
 }
+function Cnt($j) { if ($null -eq $j) { return 0 } else { return @($j).Count } }
 function Check($name, $cond) { if ($cond) { Write-Host "  OK   $name" -ForegroundColor Green } else { Write-Host "  FAIL $name" -ForegroundColor Red; $script:fails++ } }
 
 Write-Host '1) health'
@@ -73,5 +74,38 @@ Write-Host '6) aislamiento'
 $s = (Call POST '/auth/login' $null @{ email = 'admin.sur@demo-sur.local'; password = $pass }).Json.accessToken
 Check 'admin.sur no entra a Norte (403)' ((Call POST '/auth/select-tenant' $s @{ tenantId = $norte }).Status -eq 403)
 Check 'sin token (401)' ((Call GET '/properties').Status -eq 401)
+
+Write-Host '7) visitantes: QR de un solo uso y autorizacion en tiempo real'
+$unit101 = ($mine.Json | Where-Object { $_.identifier -eq 'T1-101' }).unitId
+$to = (Get-Date).ToUniversalTime().AddHours(2).ToString('o')
+$inv = Call POST '/my/visitors/invitations' $ot @{ unitId = $unit101; visitorName = 'Carlos Gomez'; peopleCount = 2; validTo = $to }
+Check 'invitacion con QR (201)' ($inv.Status -eq 201 -and $inv.Json.qrToken)
+$qr = $inv.Json.qrToken
+Check 'validar QR sin ingresar' ((Call POST '/visitors/validate-qr' $guard @{ token = $qr }).Json.valid -eq $true)
+$ci = Call POST '/visitors/check-in-qr' $guard @{ token = $qr }
+Check 'ingreso con QR (201, INSIDE)' ($ci.Status -eq 201 -and $ci.Json.status -eq 'INSIDE')
+$again = Call POST '/visitors/check-in-qr' $guard @{ token = $qr }
+Check 'QR reutilizado (409 QR_ALREADY_USED)' ($again.Status -eq 409 -and $again.Json.code -eq 'QR_ALREADY_USED')
+Check 'salida del visitante' ((Call POST "/visitors/visits/$($ci.Json.id)/check-out" $guard).Status -eq 200)
+$wi = Call POST '/visitors/walk-in' $guard @{ unitId = $unit101; visitorName = 'Visitante sin invitacion' }
+Check 'solicitud sin invitacion (201, PENDING_AUTH)' ($wi.Status -eq 201 -and $wi.Json.status -eq 'PENDING_AUTH')
+Check 'ingreso sin autorizacion (409)' ((Call POST "/visitors/visits/$($wi.Json.id)/check-in" $guard).Status -eq 409)
+Check 'residente ve la solicitud pendiente' ((Cnt (Call GET '/my/visitors/requests?status=PENDING_AUTH' $ot).Json) -ge 1)
+Check 'residente autoriza' ((Call POST "/my/visitors/requests/$($wi.Json.id)/authorize" $ot).Json.status -eq 'AUTHORIZED')
+Check 'ingreso autorizado (INSIDE)' ((Call POST "/visitors/visits/$($wi.Json.id)/check-in" $guard).Json.status -eq 'INSIDE')
+Check 'salida' ((Call POST "/visitors/visits/$($wi.Json.id)/check-out" $guard).Status -eq 200)
+
+Write-Host '8) paquetes, novedades y resumen de seguridad'
+$pk = Call POST '/packages' $guard @{ unitId = $unit101; recipientName = 'Juan Perez'; carrier = 'Servientrega'; trackingNumber = 'SV-SMOKE' }
+Check 'paquete recibido (201)' ($pk.Status -eq 201 -and $pk.Json.status -eq 'RECEIVED')
+Check 'residente ve sus paquetes' ((Cnt (Call GET '/my/packages' $ot).Json) -ge 1)
+Check 'entrega registrada' ((Call POST "/packages/$($pk.Json.id)/deliver" $guard @{ deliveredTo = 'Juan Perez' }).Json.status -eq 'DELIVERED')
+Check 'segunda entrega (409)' ((Call POST "/packages/$($pk.Json.id)/deliver" $guard @{ deliveredTo = 'Otro' }).Status -eq 409)
+$inc = Call POST '/incidents' $guard @{ category = 'SEGURIDAD'; description = 'Puerta del sotano abierta'; location = 'Sotano 1' }
+Check 'novedad registrada (201)' ($inc.Status -eq 201)
+Check 'residente no ve novedades (403)' ((Call GET '/incidents' $ot).Status -eq 403)
+Check 'administrador ve novedades' ((Call GET '/incidents' $admin).Status -eq 200)
+$sum = Call GET '/security/summary' $guard
+Check 'resumen de seguridad' ($sum.Status -eq 200 -and $null -ne $sum.Json.vehiclesInside)
 
 if ($fails -eq 0) { Write-Host 'TODO OK' -ForegroundColor Green } else { Write-Host "HAY $fails FALLOS" -ForegroundColor Red; exit 1 }
