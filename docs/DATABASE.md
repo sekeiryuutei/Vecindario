@@ -26,3 +26,8 @@ entrada/salida de vehículos, modificación/eliminación solo si está fuera, e 
 `visitor_invitations` (QR guardado solo como hash SHA-256; `max_entries`/`used_count`) · `visits` (INVITATION/WALK_IN; PENDING_AUTH → AUTHORIZED|REJECTED → INSIDE → LEFT)
 · `packages` (RECEIVED/NOTIFIED/DELIVERED/RETURNED) · `incidents` (OPEN/IN_REVIEW/CLOSED). Alertas de visitantes (`INVALID_QR`, `VISITOR_EXPIRED`) reutilizan `security_alerts`.
 El ingreso por QR es una sola sentencia (CTE `UPDATE visitor_invitations ... RETURNING` + `INSERT visits`), atómica frente a lecturas simultáneas del mismo código.
+
+## Fase 3a (schema de cada tenant, migración V4)
+`billing_settings` (fila única) · `charges` (NUMERIC(14,2); `CHECK amount + adjusted_amount >= paid_amount` impide sobrepagar a nivel de BD; índice único parcial de cuota
+ordinaria por inmueble+periodo) · `payments` (`idempotency_key` único parcial; `unapplied_amount` = saldo a favor) · `payment_allocations` · `ledger_entries` (inmutable por trigger).
+Dinero siempre NUMERIC/BigDecimal. Global V5 agrega el permiso `FINANCE_VIEW_OWN`.

@@ -21,4 +21,11 @@
     el QR de un tenant no sirve en otro; paquetes (ciclo, doble entrega, privacidad, aislamiento); novedades (cierre exige resolución, asignación solo a miembros activos)
     y resumen de seguridad con permisos.
 
-Pendiente en fases siguientes: reservas, pagos, conciliación y E2E Playwright.
+  - `BillingIT` (Fase 3a): el ejemplo de la especificación (Ordinaria 300.000 / Extraordinaria 150.000 / Intereses 50.000, pago de 300.000 → 50.000 / 150.000 / 100.000) y el cambio de orden;
+    idempotencia (reintento = mismo pago; **6 reintentos simultáneos → 1 solo pago**); **6 pagos simultáneos nunca sobrepagan** y el saldo a favor se aplica a cargos nuevos;
+    reversión de pagos y libro inmutable (UPDATE/DELETE rechazados, `CHECK` anti-sobrepago); anulaciones y notas crédito/débito; facturación masiva idempotente repartida por coeficiente;
+    intereses de mora (3% mensual, 30 días sobre 100.000 = 3.000) idempotentes por fecha; permisos (contador, consejo, secretaría, portero, propietario, arrendatario configurable)
+    y aislamiento entre copropiedades. Cada escenario verifica el **invariante**: saldo del libro = pendiente de cargos − saldo a favor.
+- Unitario `PaymentAllocatorTest`: orden configurable, antiguo/reciente primero, abonos parciales, sobrante y 300 casos aleatorios (jamás se asigna más de lo debido ni de lo pagado).
+
+Pendiente en fases siguientes: conciliación, Wompi, reservas y E2E Playwright.

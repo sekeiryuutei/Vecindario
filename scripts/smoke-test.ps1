@@ -10,8 +10,9 @@ $pass = if ($envMap['APP_SEED_PASSWORD']) { $envMap['APP_SEED_PASSWORD'] } else 
 $base = "http://localhost:$port/api/v1"
 $fails = 0
 
-function Call($method, $path, $token = $null, $body = $null) {
+function Call($method, $path, $token = $null, $body = $null, $extra = @{}) {
   $h = @{}; if ($token) { $h['Authorization'] = "Bearer $token" }
+  foreach ($k in $extra.Keys) { $h[$k] = $extra[$k] }
   $args = @{ Uri = "$base$path"; Method = $method; Headers = $h; UseBasicParsing = $true }
   if ($body) { $args['Body'] = ($body | ConvertTo-Json -Compress); $args['ContentType'] = 'application/json' }
   elseif ($method -in 'POST', 'PUT', 'PATCH') { $args['Body'] = '{}'; $args['ContentType'] = 'application/json' }  # PowerShell enviaria form-urlencoded por defecto
@@ -108,5 +109,30 @@ Check 'residente no ve novedades (403)' ((Call GET '/incidents' $ot).Status -eq 
 Check 'administrador ve novedades' ((Call GET '/incidents' $admin).Status -eq 200)
 $sum = Call GET '/security/summary' $guard
 Check 'resumen de seguridad' ($sum.Status -eq 200 -and $null -ne $sum.Json.vehiclesInside)
+
+Write-Host '9) cartera: imputacion, idempotencia, estado de cuenta y privacidad'
+$acc = (Call POST '/auth/login' $null @{ email = 'contador@demo-norte.local'; password = $pass }).Json.accessToken
+Check 'contador ve la configuracion financiera' ((Call GET '/billing/settings' $acc).Status -eq 200)
+$pf = Call GET '/billing/portfolio?overdueOnly=true&size=50' $acc
+Check 'cartera con mora (totales)' ($pf.Status -eq 200 -and $pf.Json.totalOverdue -gt 0)
+$row = $pf.Json.units.content | Where-Object { $_.unitIdentifier -ne 'T1-101' } | Select-Object -First 1
+$before = (Call GET "/billing/units/$($row.unitId)/statement" $acc).Json.closingBalance
+$key = 'smoke-' + [guid]::NewGuid().ToString()
+$p1 = Call POST '/payments' $acc @{ unitId = $row.unitId; amount = 50000; method = 'CASH'; reference = 'SMOKE' } @{ 'Idempotency-Key' = $key }
+Check 'pago registrado (201)' ($p1.Status -eq 201 -and @($p1.Json.allocations).Count -ge 1)
+$p2 = Call POST '/payments' $acc @{ unitId = $row.unitId; amount = 50000; method = 'CASH'; reference = 'SMOKE' } @{ 'Idempotency-Key' = $key }
+Check 'reintento con la misma llave (200, mismo pago)' ($p2.Status -eq 200 -and $p2.Json.payment.id -eq $p1.Json.payment.id)
+$after = (Call GET "/billing/units/$($row.unitId)/statement" $acc).Json.closingBalance
+Check 'el saldo bajo una sola vez (50.000)' (($before - $after) -eq 50000)
+Check 'reversion con motivo' ((Call POST "/payments/$($p1.Json.payment.id)/reverse" $acc @{ reason = 'Prueba de humo' }).Json.payment.status -eq 'REVERSED')
+Check 'libro de movimientos' ((Call GET "/billing/units/$($row.unitId)/ledger" $acc).Json.totalElements -ge 3)
+Check 'propietario ve su estado de cuenta' ((Call GET "/my/statement?unitId=$unit101" $ot).Status -eq 200)
+Check 'propietario no ve la cartera (403)' ((Call GET '/billing/portfolio' $ot).Status -eq 403)
+$secr = (Call POST '/auth/login' $null @{ email = 'secretaria@demo-norte.local'; password = $pass }).Json.accessToken
+Check 'secretaria sin acceso financiero (403)' ((Call GET '/billing/portfolio' $secr).Status -eq 403)
+$cons = (Call POST '/auth/login' $null @{ email = 'consejo@demo-norte.local'; password = $pass }).Json.accessToken
+Check 'consejo ve cartera (200)' ((Call GET '/billing/portfolio' $cons).Status -eq 200)
+Check 'consejo no crea cargos (403)' ((Call POST '/billing/charges' $cons @{ unitId = $unit101; type = 'FINE'; description = 'x'; dueDate = (Get-Date).ToString('yyyy-MM-dd'); amount = 1000 }).Status -eq 403)
+Check 'intereses de mora (corrida idempotente)' ((Call POST '/billing/runs/interest' $admin @{}).Status -eq 200)
 
 if ($fails -eq 0) { Write-Host 'TODO OK' -ForegroundColor Green } else { Write-Host "HAY $fails FALLOS" -ForegroundColor Red; exit 1 }

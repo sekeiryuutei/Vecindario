@@ -1,5 +1,7 @@
 # API v1
 
+**Content-Type:** todo cuerpo se envía como `application/json` (incluso un POST sin datos usa `{}`); de lo contrario la API responde 415 `UNSUPPORTED_MEDIA_TYPE`.
+
 Swagger UI: `/swagger-ui.html` · OpenAPI JSON: `/v3/api-docs`. Paginación: `?page=0&size=20` (máx. 100) →
 `{content, page, size, totalElements, totalPages}`. Errores: `{code, message, timestamp, path, traceId, details}`.
 
@@ -54,3 +56,18 @@ Códigos nuevos: `INVALID_QR` 404, `QR_ALREADY_USED` / `QR_EXPIRED` / `QR_NOT_YE
 `VISIT_REJECTED` 403, `VISIT_ALREADY_DECIDED` 409, `VISIT_NOT_INSIDE` 409, `PARCEL_NOT_PENDING` 409, `RESOLUTION_REQUIRED` 400, `USER_NOT_MEMBER` 409.
 
 Flujo sin invitación: portero `POST /visitors/walk-in` → residente ve `GET /my/visitors/requests?status=PENDING_AUTH` → `authorize|reject` → portero `check-in` (solo si AUTHORIZED).
+
+## Fase 3a (cartera)
+| Método y ruta | Permiso |
+|---|---|
+| GET/PUT `/billing/settings` | FINANCE_VIEW / FINANCE_MANAGE |
+| POST/GET `/billing/charges` · GET `/billing/charges/{id}` | FINANCE_MANAGE / FINANCE_VIEW |
+| POST `/billing/charges/{id}/void` · POST `/billing/charges/{id}/adjustments` (CREDIT/DEBIT) | FINANCE_MANAGE |
+| POST `/billing/runs/ordinary` · POST `/billing/runs/interest` | FINANCE_MANAGE |
+| GET `/billing/portfolio` · GET `/billing/units/{id}/statement` · GET `/billing/units/{id}/ledger` | FINANCE_VIEW |
+| POST `/payments` (header `Idempotency-Key`) | PAYMENTS_CREATE |
+| GET `/payments`, `/payments/{id}` · POST `/payments/{id}/reverse` | FINANCE_VIEW / FINANCE_MANAGE |
+| GET `/my/statement?unitId=` | FINANCE_VIEW_OWN (propietario por defecto; configurable por copropiedad) |
+
+POST `/payments`: 201 la primera vez, **200** con el mismo pago si se repite la `Idempotency-Key` (campo `replayed: true`), 409 `IDEMPOTENCY_KEY_REUSED` si la llave se reutiliza con otro monto/inmueble.
+Códigos: `CHARGE_ALREADY_EXISTS`, `CHARGE_HAS_PAYMENTS`, `CHARGE_ALREADY_VOIDED`, `ADJUSTMENT_NOT_ALLOWED`, `PAYMENT_ALREADY_REVERSED`, `INTEREST_DISABLED`, `INVALID_AMOUNT`, `INVALID_PAYMENT_DATE`, `INVALID_RUN`, `INVALID_ALLOCATION_ORDER`.

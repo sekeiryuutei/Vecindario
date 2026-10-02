@@ -2,7 +2,7 @@
 
 Desarrollada por **CodeVam**. Nombre y empresa visibles configurables (`APP_NAME`, `APP_COMPANY` en `.env`).
 
-> **Estado: Fases 1, 2a y 2b de 5 (backend + infraestructura).**
+> **Estado: Fases 1, 2a, 2b y 3a de 5 (backend + infraestructura).**
 > Este ZIP incluye la base de la plataforma: multi-tenancy (un schema PostgreSQL por copropiedad), Flyway, JWT con refresh
 > rotativo, RBAC con permisos configurables por copropiedad, auditoría, gestión de usuarios/membresías con historial,
 > área de super admin, inmuebles (primer módulo de tenant), Swagger, seed, Docker, Nginx, PostgreSQL, Redis y MinIO.
@@ -11,7 +11,9 @@ Desarrollada por **CodeVam**. Nombre y empresa visibles configurables (`APP_NAME
 > alertas de seguridad y la vista del residente limitada a sus propios inmuebles.
 > La **Fase 2b** agrega: visitantes con invitación y QR temporal de un solo uso, autorización en tiempo real de visitantes sin invitación,
 > paquetería, novedades de portería y un resumen operativo de seguridad.
-> **No incluye todavía**: finanzas, PQRS, reservas, notificaciones por canal, documentos/fotos, etc. (Fases 3 a 5) ni el frontend.
+> La **Fase 3a** agrega la cartera: cargos, facturación masiva idempotente, imputación de pagos con orden configurable, pagos con
+> Idempotency-Key y reversión, notas crédito/débito, intereses de mora, saldo a favor, estados de cuenta y libro de movimientos inmutable (ver [docs/BILLING.md](docs/BILLING.md)).
+> **No incluye todavía**: conciliación bancaria, Wompi y certificados PDF (Fase 3b), PQRS, reservas, notificaciones por canal, documentos/fotos (Fases 4 y 5) ni el frontend.
 > Ver [docs/ROADMAP.md](docs/ROADMAP.md).
 >
 > **Importante:** este código fue escrito sin poder compilarlo ni ejecutarlo en el entorno donde se generó (sin Maven,
@@ -68,7 +70,7 @@ Con frontend (Fase 5): `docker compose --profile frontend up -d --build`.
 | Swagger UI | http://localhost:48124/swagger-ui.html |
 | Health | http://localhost:48124/actuator/health |
 
-Prueba rápida automática: en **PowerShell** `.\scripts\smoke-test.ps1` (puede requerir `Set-ExecutionPolicy -Scope Process Bypass`); en Git Bash/WSL `./scripts/smoke-test.sh` (solo cubre la Fase 1). El `.ps1` cubre Fases 1, 2a y 2b.
+Prueba rápida automática: en **PowerShell** `.\scripts\smoke-test.ps1` (puede requerir `Set-ExecutionPolicy -Scope Process Bypass`); en Git Bash/WSL `./scripts/smoke-test.sh` (solo cubre la Fase 1). El `.ps1` cubre Fases 1, 2a, 2b y 3a.
 
 ## Usuarios demo (solo desarrollo; contraseña = `APP_SEED_PASSWORD`, por defecto `Demo#2026!`)
 
@@ -106,6 +108,17 @@ curl -s -X POST $BASE/my/visitors/invitations -H "Authorization: Bearer <token p
 # portero valida y registra el ingreso
 curl -s -X POST $BASE/visitors/check-in-qr -H "Authorization: Bearer <token portero>" -H 'Content-Type: application/json' -d '{"token":"<qrToken>"}'
 ```
+
+### Cartera (ejemplo)
+
+```bash
+# contador@demo-norte.local: registra un pago idempotente (reintentar con la misma llave NO lo duplica)
+curl -s -X POST $BASE/payments -H "Authorization: Bearer <token contador>" -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: pago-2026-10-0001' -d '{"unitId":"<id inmueble>","amount":"300000","method":"TRANSFER","reference":"CONSIGNACION 123"}'
+# estado de cuenta y libro de movimientos
+curl -s "$BASE/billing/units/<id inmueble>/statement" -H "Authorization: Bearer <token contador>"
+```
+Los cuerpos JSON siempre deben enviarse con `Content-Type: application/json` (también en POST sin datos: usa `{}`).
 
 ### Flujo con curl
 
