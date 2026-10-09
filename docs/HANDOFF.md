@@ -30,7 +30,8 @@ Swagger: `http://localhost:48124/swagger-ui.html`. Usuarios demo y contraseña: 
 | 3b | Conciliación bancaria CSV/XLSX asíncrona, perfiles por banco, matching con puntaje, duplicados, revisión manual, reversión | **Verificada** |
 | 3c | Wompi + certificados PDF con OpenPDF y verificación pública con hash | **Verificada** |
 | 4 | Zonas comunes y reservas (bloqueo por mora, reglas horarias), PQRS con SLA (24h para ruido) y notas privadas, comunicados segmentados, notificaciones multicanal, almacenamiento `StoragePort` y repositorio de documentos, asambleas y votación ponderada Ley 675 | **Verificada (16/16 secciones TODO OK)** |
-| 5 | Mantenimiento, proveedores, presupuesto administrativo, reportes, frontend Angular + Ionic + Capacitor + PWA | Pendiente (siguiente paso) |
+| 5 | Mantenimiento, proveedores, presupuesto administrativo, reportes CSV/PDF, cámaras LPR desacopladas | **Backend 100% verificado (83 tests unitarios, 20/20 secciones smoke-test TODO OK)** |
+| 6 | Frontend Angular + Ionic + Capacitor + PWA: interfaces de administración y portal de residentes | Siguiente paso |
 
 ## 4. Decisiones de arquitectura que hay que respetar
 - **Tenant**: sale SIEMPRE del JWT (`tid`) + membresía verificada en BD en cada petición (`JwtAuthenticationFilter`). Nunca de parámetros/headers/cuerpo. Rol y permisos se leen de BD (no van en el token) → revocación inmediata.

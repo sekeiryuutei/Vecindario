@@ -1,4 +1,5 @@
-target/
+target/*
+!target/app.jar
 .idea/
 *.iml
 .vscode/

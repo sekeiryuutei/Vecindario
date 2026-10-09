@@ -120,3 +120,21 @@ Códigos: `IMPORT_ALREADY_EXISTS` 409, `ROW_NOT_PENDING` 409, `ROW_NOT_APPLIED` 
 | GET `/assemblies/topics/{id}/results` | ASSEMBLIES_VIEW |
 | POST `/my/assemblies/topics/{id}/vote` | ASSEMBLIES_VOTE (ponderación por coeficiente Ley 675) |
 
+## Fase 5 (Proveedores, Mantenimiento, Presupuestos, Reportes y Cámaras LPR)
+| Método y ruta | Permiso |
+|---|---|
+| GET/POST `/suppliers` · GET/PUT/DELETE `/suppliers/{id}` | SUPPLIERS_VIEW / SUPPLIERS_MANAGE |
+| GET/POST `/suppliers/{id}/contracts` | SUPPLIERS_VIEW / SUPPLIERS_MANAGE |
+| GET/POST `/maintenance/assets` · GET/PUT `/maintenance/assets/{id}` | MAINTENANCE_VIEW / MAINTENANCE_MANAGE |
+| GET/POST `/maintenance/plans` · GET `/maintenance/plans/{id}` | MAINTENANCE_VIEW / MAINTENANCE_MANAGE |
+| GET/POST `/maintenance/work-orders` · GET `/maintenance/work-orders/{id}` | MAINTENANCE_VIEW / MAINTENANCE_MANAGE |
+| PATCH/PUT `/maintenance/work-orders/{id}/status` | MAINTENANCE_MANAGE |
+| GET/POST `/budgets` · GET `/budgets/{id}` | BUDGET_VIEW / BUDGET_MANAGE |
+| GET/POST `/budgets/{id}/items` · GET `/budgets/items/{itemId}` | BUDGET_VIEW / BUDGET_MANAGE |
+| POST/GET `/budgets/items/{itemId}/executions` | BUDGET_MANAGE / BUDGET_VIEW |
+| GET `/budgets/{year}/summary` | BUDGET_VIEW |
+| GET `/reports/portfolio` · `/reports/budget/{year}` · `/reports/maintenance` | REPORTS_VIEW |
+| GET `/reports/portfolio/export/csv` · `/reports/portfolio/export/pdf` | REPORTS_EXPORT |
+| GET `/cameras/status` · POST `/cameras/detect` | VEHICLES_VIEW / VEHICLES_MANAGE |
+
+

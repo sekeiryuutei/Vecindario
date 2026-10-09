@@ -404,4 +404,129 @@ Check 'votacion cerrada por administracion' ($closeVote.Status -eq 200 -and $clo
 $results = Call GET "/assemblies/topics/$topicId/results" $admin
 Check 'resultados certificados (A FAVOR ganador)' ($results.Status -eq 200 -and $results.Json.winningOption -eq 'A FAVOR' -and $results.Json.totalVotes -eq 1)
 
+Write-Host '17) Proveedores y Contratos (Fase 5)'
+$sups = Call GET '/suppliers' $admin
+Check 'proveedores demo consultados' ($sups.Status -eq 200 -and $sups.Json.totalElements -ge 2)
+$demoSup = $sups.Json.content[0]
+
+$newSup = Call POST '/suppliers' $admin @{
+  taxId = "901999888-$((Get-Random -Minimum 1 -Maximum 9))"
+  name = "Jardines y Paisajismo S.A.S. $((Get-Random))"
+  contactName = 'Pedro Pérez'
+  contactPhone = '3119998877'
+  contactEmail = 'jardines@valle.local'
+  category = 'JARDINERIA'
+  rating = 5
+  notes = 'Proveedor de mantenimiento de zonas verdes'
+}
+Check 'crear nuevo proveedor (201)' ($newSup.Status -eq 201 -and $newSup.Json.id)
+$newSupId = $newSup.Json.id
+
+$contracts = Call GET "/suppliers/$($demoSup.id)/contracts" $admin
+Check 'contratos de proveedor demo consultados' ($contracts.Status -eq 200 -and @($contracts.Json).Count -ge 1)
+
+$newCtr = Call POST "/suppliers/$newSupId/contracts" $admin @{
+  contractNumber = "CTR-JAR-$((Get-Random))"
+  title = 'Mantenimiento mensual jardines'
+  description = 'Poda de césped y ornato mensual'
+  startDate = (Get-Date).ToString("yyyy-MM-dd")
+  endDate = (Get-Date).AddMonths(6).ToString("yyyy-MM-dd")
+  monthlyAmount = 450000.00
+  totalAmount = 2700000.00
+  hasInsurancePolicy = $true
+  insurancePolicyNumber = 'POL-JAR-001'
+  insuranceExpirationDate = (Get-Date).AddMonths(6).ToString("yyyy-MM-dd")
+}
+Check 'crear contrato de proveedor (201)' ($newCtr.Status -eq 201 -and $newCtr.Json.id)
+
+Write-Host '18) Mantenimiento y Ordenes de Trabajo (Fase 5)'
+$assets = Call GET '/maintenance/assets' $admin
+Check 'activos de mantenimiento consultados' ($assets.Status -eq 200 -and @($assets.Json).Count -ge 2)
+$assetElev = ($assets.Json | Where-Object { $_.category -eq 'ELEVATOR' })[0]
+
+$plans = Call GET "/maintenance/plans?assetId=$($assetElev.id)" $admin
+Check 'planes de mantenimiento consultados' ($plans.Status -eq 200 -and @($plans.Json).Count -ge 1)
+$planElev = $plans.Json[0]
+
+$orders = Call GET '/maintenance/work-orders' $admin
+Check 'ordenes de trabajo consultadas' ($orders.Status -eq 200 -and $orders.Json.totalElements -ge 1)
+
+$newWo = Call POST '/maintenance/work-orders' $admin @{
+  assetId = $assetElev.id
+  planId = $planElev.id
+  supplierId = $demoSup.id
+  type = 'PREVENTIVE'
+  title = "Inspección correctiva de prueba $((Get-Random))"
+  description = 'Ajuste de contactores y sensores de puerta'
+  priority = 'HIGH'
+  estimatedCost = 250000.00
+  assignedTo = 'Técnico de Turno'
+}
+Check 'crear orden de trabajo (201)' ($newWo.Status -eq 201 -and $newWo.Json.id)
+$woId = $newWo.Json.id
+
+$closeWo = Call PUT "/maintenance/work-orders/$woId/status" $admin @{
+  status = 'COMPLETED'
+  actualCost = 245000.00
+  completionNotes = 'Sensores calibrados exitosamente y en servicio normal.'
+}
+Check 'completar orden de trabajo con costo real (200)' ($closeWo.Status -eq 200 -and $closeWo.Json.status -eq 'COMPLETED' -and $closeWo.Json.actualCost -eq 245000.00)
+
+Write-Host '19) Presupuesto Anual y Ejecucion (Fase 5)'
+$budgets = Call GET '/budgets' $admin
+Check 'presupuestos consultados' ($budgets.Status -eq 200 -and @($budgets.Json).Count -ge 1)
+$b2026 = $budgets.Json[0]
+
+$bSummary = Call GET '/budgets/2026/summary' $admin
+Check 'resumen presupuestal 2026 calculado' ($bSummary.Status -eq 200 -and $bSummary.Json.totalIncomeBudgeted -gt 0 -and $bSummary.Json.totalExpenseBudgeted -gt 0)
+
+$bItems = Call GET "/budgets/$($b2026.id)/items" $admin
+Check 'rubros presupuestales consultados' ($bItems.Status -eq 200 -and @($bItems.Json).Count -ge 3)
+
+$newItem = Call POST "/budgets/$($b2026.id)/items" $admin @{
+  code = "3.1.$((Get-Random -Minimum 10 -Maximum 99))"
+  name = "Imprevistos y Fondo de Reserva $((Get-Random))"
+  type = 'EXPENSE'
+  budgetedAmount = 5000000.00
+}
+Check 'crear nuevo rubro presupuestal (201)' ($newItem.Status -eq 201 -and $newItem.Json.id)
+$itemId = $newItem.Json.id
+
+$newExec = Call POST "/budgets/items/$itemId/executions" $admin @{
+  amount = 150000.00
+  executionDate = (Get-Date).ToString("yyyy-MM-dd")
+  invoiceNumber = "FAC-IMP-$((Get-Random))"
+  description = 'Atención fuga imprevista cuarto de bombas'
+}
+Check 'registrar ejecucion presupuestal (201)' ($newExec.Status -eq 201 -and $newExec.Json.id)
+
+$execs = Call GET "/budgets/items/$itemId/executions" $admin
+Check 'ejecuciones del rubro consultadas' ($execs.Status -eq 200 -and @($execs.Json).Count -ge 1)
+
+Write-Host '20) Reportes Consolidados y Camaras LPR (Fase 5)'
+$repPort = Call GET '/reports/portfolio' $admin
+Check 'reporte de cartera consolidado' ($repPort.Status -eq 200 -and @($repPort.Json.items).Count -ge 1)
+
+$csvResp = Invoke-WebRequest -Uri "$base/reports/portfolio/export/csv" -Headers @{ Authorization = "Bearer $admin" } -UseBasicParsing
+Check 'exportar reporte de cartera en CSV (200)' ($csvResp.StatusCode -eq 200 -and $csvResp.Content -like '*Inmueble;Torre;Saldo Pendiente*')
+
+$pdfResp = Invoke-WebRequest -Uri "$base/reports/portfolio/export/pdf" -Headers @{ Authorization = "Bearer $admin" } -UseBasicParsing
+$pdfMagic = [System.Text.Encoding]::ASCII.GetString($pdfResp.Content[0..3])
+Check 'exportar reporte de cartera en PDF (200 %PDF)' ($pdfResp.StatusCode -eq 200 -and $pdfMagic -eq '%PDF')
+
+$repBud = Call GET '/reports/budget/2026' $admin
+Check 'reporte de presupuesto 2026' ($repBud.Status -eq 200 -and $repBud.Json.year -eq 2026)
+
+$repMaint = Call GET '/reports/maintenance' $admin
+Check 'reporte de mantenimiento' ($repMaint.Status -eq 200 -and $repMaint.Json.totalAssets -ge 2 -and $repMaint.Json.totalWorkOrders -ge 1)
+
+$camStatus = Call GET '/cameras/status' $admin
+Check 'estado de camara LPR ONLINE' ($camStatus.Status -eq 200 -and $camStatus.Json.status -eq 'ONLINE')
+
+$camDetAuth = Call POST '/cameras/detect' $admin @{ source = 'GATE_MAIN_LPR'; plate = 'ABC123' }
+Check 'deteccion LPR placa registrada autorizada' ($camDetAuth.Status -eq 200 -and $camDetAuth.Json.registered -eq $true)
+
+$camDetUnk = Call POST '/cameras/detect' $admin @{ source = 'GATE_MAIN_LPR'; plate = 'ZZZ999' }
+Check 'deteccion LPR placa desconocida visitante' ($camDetUnk.Status -eq 200 -and $camDetUnk.Json.registered -eq $false)
+
 if ($fails -eq 0) { Write-Host 'TODO OK' -ForegroundColor Green } else { Write-Host "HAY $fails FALLOS" -ForegroundColor Red; exit 1 }

@@ -57,3 +57,16 @@ Dinero siempre NUMERIC/BigDecimal. Global V5 agrega el permiso `FINANCE_VIEW_OWN
   - `assembly_topics`: temas con opciones JSONB y tipo de votación NOMINAL o COEFFICIENT (ponderada Ley 675).
   - `assembly_votes`: votos únicos por inmueble (`uq_assembly_votes_topic_unit`) con peso según coeficiente de propiedad horizontal.
 
+## Fase 5 (migraciones V9 global y V8 tenant)
+- Global `public` (V9): Permisos adicionales `SUPPLIERS_VIEW`, `SUPPLIERS_MANAGE`, `BUDGET_VIEW`, `BUDGET_MANAGE`, `REPORTS_EXPORT` asignados a ADMINISTRADOR, CONSEJO, CONTADOR, REVISOR_FISCAL y PROPIETARIO.
+- Tenant `{s}` (V8):
+  - `suppliers`: catálogo de proveedores y contratistas, NIT único por tenant, categoría, datos de contacto, calificación.
+  - `supplier_contracts`: contratos vigentes/vencidos, números de contrato, plazos, valores mensuales/totales, pólizas de cumplimiento.
+  - `maintenance_assets`: activos y equipos críticos (ascensores, motobombas, plantas eléctricas), marca, modelo, serial, ubicación y garantía.
+  - `maintenance_plans`: planes de mantenimiento preventivo calendarizados por frecuencia en días, asignados a proveedores especializados.
+  - `work_orders`: órdenes de trabajo (PREVENTIVE, CORRECTIVE, EMERGENCY) con secuencia anual `OT-YYYY-XXXX`, seguimiento de estados, costos estimados vs reales y notas de cierre.
+  - `annual_budgets`: presupuestos anuales aprobados o en borrador con totales consolidados de ingresos y gastos.
+  - `budget_items`: rubros presupuestales codificados (INCOME / EXPENSE), montos presupuestados y acumulados de ejecución.
+  - `budget_executions`: registros inmutables de ejecución de gasto/ingreso asociados a órdenes de trabajo, facturas y proveedores.
+
+

@@ -12,7 +12,7 @@ Cada fase se entrega como ZIP verificable. Las fases posteriores agregan migraci
 | 3b | Conciliación bancaria: CSV/XLSX asíncrono, perfiles por banco, matching con puntaje, revisión manual, duplicados, reversión | **Completada y verificada** |
 | 3c | Wompi (transacción, webhook con firma e idempotencia, feature flag ONLINE_PAYMENTS) y certificados PDF (paz y salvo, estado de cuenta, propiedad con OpenPDF) | **Completada y verificada** |
 | 4 | Zonas comunes y reservas (concurrencia, mora), PQRS/convivencia con SLA, comunicados, notificaciones multicanal, almacenamiento y documentos (StoragePort), asambleas y votación ponderada Ley 675 | **Completada y verificada** |
-| 5 | Mantenimiento y órdenes de trabajo, proveedores, presupuesto y contabilidad administrativa, reportes (CSV/XLSX/PDF), frontend Angular+Ionic+Capacitor+PWA | Pendiente (siguiente fase) |
+| 5 | Mantenimiento y órdenes de trabajo, proveedores, presupuesto y ejecución de gastos, reportes (CSV/PDF), cámaras LPR desacopladas, frontend Angular+Ionic+Capacitor+PWA | **Backend completado y verificado (smoke tests 1-20)** |
 
 ## Pendientes conocidos de la Fase 1
 - Envío real de correo (hoy `LoggingAccountMailAdapter`; el SMTP llega con notificaciones).
