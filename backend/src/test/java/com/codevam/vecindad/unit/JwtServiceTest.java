@@ -20,7 +20,8 @@ class JwtServiceTest {
         return new AppProperties("Vecindad", "CodeVam", env, new AppProperties.Mail(false),
                 new AppProperties.Jwt(secret, "vecindad", Duration.ofMinutes(15), Duration.ofDays(7)),
                 new AppProperties.Security(5, Duration.ofMinutes(15), Duration.ofMinutes(30), Duration.ofHours(72), 10, 4, List.of()),
-                new AppProperties.Seed(false, "x"));
+                new AppProperties.Seed(false, "x"),
+                new AppProperties.Wompi("", "", "", "", "", ""));
     }
 
     @Test

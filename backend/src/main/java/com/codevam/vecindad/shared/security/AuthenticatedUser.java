@@ -10,4 +10,6 @@ public record AuthenticatedUser(UUID userId, String email, String fullName, Stri
     public boolean hasTenant() { return tenantId != null; }
 
     public boolean isPlatformAdmin() { return "SUPER_ADMIN_PLATFORM".equals(platformRole); }
+
+    public boolean hasPermission(String perm) { return permissions != null && permissions.contains(perm); }
 }

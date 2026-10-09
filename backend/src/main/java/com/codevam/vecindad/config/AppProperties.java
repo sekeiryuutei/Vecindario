@@ -7,7 +7,7 @@ import java.util.List;
 
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(String name, String company, String env, Mail mail, Jwt jwt,
-                            Security security, Seed seed) {
+                            Security security, Seed seed, Wompi wompi) {
 
     public record Mail(boolean devLogLinks) {}
 
@@ -18,6 +18,9 @@ public record AppProperties(String name, String company, String env, Mail mail, 
                            List<String> corsAllowedOrigins) {}
 
     public record Seed(boolean enabled, String password) {}
+
+    public record Wompi(String publicKey, String privateKey, String eventsSecret, String integritySecret,
+                        String apiUrl, String redirectUrl) {}
 
     public boolean isProduction() {
         return "production".equalsIgnoreCase(env);

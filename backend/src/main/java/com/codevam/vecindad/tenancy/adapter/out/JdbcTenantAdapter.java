@@ -110,4 +110,10 @@ public class JdbcTenantAdapter implements TenantPort {
                 rs -> { out.put(rs.getString("feature"), rs.getBoolean("enabled")); }, tenantId);
         return out;
     }
+
+    @Override
+    public void setFeature(UUID tenantId, String feature, boolean enabled) {
+        jdbc.update("INSERT INTO public.tenant_features (tenant_id, feature, enabled) VALUES (?, ?, ?) "
+                + "ON CONFLICT (tenant_id, feature) DO UPDATE SET enabled = EXCLUDED.enabled", tenantId, feature, enabled);
+    }
 }

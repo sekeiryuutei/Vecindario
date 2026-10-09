@@ -106,6 +106,13 @@ public class TenantAdminService {
         return tenants.features(tenantId);
     }
 
+    public void setFeature(UUID tenantId, String feature, boolean enabled) {
+        getTenant(tenantId);
+        tenants.setFeature(tenantId, feature.trim().toUpperCase(), enabled);
+        audit.log(tenantId, "TENANT_FEATURE_UPDATED", "TENANT_FEATURE", tenantId + ":" + feature, true,
+                Map.of("feature", feature, "enabled", String.valueOf(enabled)));
+    }
+
     private static Map<String, Boolean> defaultFeatures() {
         Map<String, Boolean> f = new LinkedHashMap<>();
         f.put("WHATSAPP", false);

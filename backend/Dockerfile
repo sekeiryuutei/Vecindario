@@ -6,7 +6,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 mvn -B -DskipTests package
 
 FROM eclipse-temurin:21-jre-alpine
-RUN addgroup -S app && adduser -S app -G app
+RUN addgroup -S app && adduser -S app -G app && mkdir -p /app/data && chown -R app:app /app
 WORKDIR /app
 COPY --from=build /build/target/app.jar /app/app.jar
 USER app

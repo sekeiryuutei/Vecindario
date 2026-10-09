@@ -34,6 +34,7 @@ public class PlatformController {
                                       @Size(max = 100) String department, @Size(max = 40) String phone,
                                       @Email @Size(max = 254) String email) {}
     public record StatusRequest(@NotNull TenantStatus status) {}
+    public record FeatureUpdateRequest(@NotNull Boolean enabled) {}
     public record AddMemberRequest(@NotBlank @Email @Size(max = 254) String email,
                                    @NotBlank @Size(max = 200) String fullName, @NotBlank @Size(max = 40) String role) {}
 
@@ -86,5 +87,19 @@ public class PlatformController {
     @ResponseStatus(HttpStatus.CREATED)
     public MemberView addMember(@PathVariable UUID tenantId, @Valid @RequestBody AddMemberRequest req) {
         return members.addMember(tenantId, CurrentUser.require(), req.email(), req.fullName(), req.role());
+    }
+
+    @Operation(summary = "Consulta las funcionalidades activadas para una copropiedad")
+    @GetMapping("/tenants/{tenantId}/features")
+    public java.util.Map<String, Boolean> getFeatures(@PathVariable UUID tenantId) {
+        return tenants.features(tenantId);
+    }
+
+    @Operation(summary = "Habilita o deshabilita una funcionalidad para una copropiedad (ej. ONLINE_PAYMENTS)")
+    @PutMapping("/tenants/{tenantId}/features/{feature}")
+    public java.util.Map<String, Boolean> setFeature(@PathVariable UUID tenantId, @PathVariable String feature,
+                                                     @Valid @RequestBody FeatureUpdateRequest req) {
+        tenants.setFeature(tenantId, feature, req.enabled());
+        return tenants.features(tenantId);
     }
 }

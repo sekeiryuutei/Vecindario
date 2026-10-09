@@ -28,4 +28,10 @@
     y aislamiento entre copropiedades. Cada escenario verifica el **invariante**: saldo del libro = pendiente de cargos − saldo a favor.
 - Unitario `PaymentAllocatorTest`: orden configurable, antiguo/reciente primero, abonos parciales, sobrante y 300 casos aleatorios (jamás se asigna más de lo debido ni de lo pagado).
 
-Pendiente en fases siguientes: conciliación, Wompi, reservas y E2E Playwright.
+  - `ReconciliationIT` (Fase 3b): importación CSV real y asíncrona con 5 filas → 2 conciliadas automáticamente, 1 ambigua (con candidatos y señales), 1 a revisión, 1 egreso ignorado; segundo archivo solapado →
+    la fila repetida es DUPLICATE y **el pago no se aplica dos veces**; el mismo archivo se rechaza (409); conciliación manual idempotente; rechazo con motivo; reversión de una conciliación automática
+    (revierte el pago, deja la fila en revisión, se puede reconciliar de nuevo con un pago nuevo); decisiones inmutables; archivos inválidos terminan FAILED con mensaje legible; `.xlsx` real generado con POI;
+    perfil bancario personalizado (otro delimitador, formato de fecha y separador decimal); aplicación automática desactivable; permisos y aislamiento entre copropiedades.
+- Unitarios `StatementRowMapperTest` (comillas, BOM, Windows-1252, delimitadores, montos colombianos, filas inválidas) y `MatchingEngineTest` (señales, umbrales, ambigüedad, aprendizaje de pagadores).
+
+Pendiente en fases siguientes: Wompi, certificados, reservas y E2E Playwright.

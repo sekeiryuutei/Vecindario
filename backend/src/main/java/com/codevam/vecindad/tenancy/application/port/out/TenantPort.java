@@ -25,4 +25,5 @@ public interface TenantPort {
 
     void insertDefaultFeatures(UUID tenantId, Map<String, Boolean> features);
     Map<String, Boolean> features(UUID tenantId);
+    void setFeature(UUID tenantId, String feature, boolean enabled);
 }

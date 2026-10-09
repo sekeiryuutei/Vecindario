@@ -29,6 +29,10 @@ spring:
       timeout: 2s
       repositories:
         enabled: false   # Redis solo se usa vía StringRedisTemplate; evita el modo estricto de repositorios
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jackson:
     default-property-inclusion: non_null
     serialization:
@@ -84,3 +88,13 @@ app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}
     password: ${APP_SEED_PASSWORD:Demo#2026!}
+  wompi:
+    public-key: ${WOMPI_PUBLIC_KEY:pub_test_demo}
+    private-key: ${WOMPI_PRIVATE_KEY:prv_test_demo}
+    events-secret: ${WOMPI_EVENTS_SECRET:test_events_secret}
+    integrity-secret: ${WOMPI_INTEGRITY_SECRET:test_integrity_secret}
+    api-url: ${WOMPI_API_URL:https://sandbox.wompi.co/v1}
+    redirect-url: ${WOMPI_REDIRECT_URL:http://localhost:48124/payments/wompi-result}
+  storage:
+    local-dir: ${STORAGE_LOCAL_DIR:/tmp/vecindad-storage}
+

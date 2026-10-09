@@ -2,7 +2,7 @@
 
 Desarrollada por **CodeVam**. Nombre y empresa visibles configurables (`APP_NAME`, `APP_COMPANY` en `.env`).
 
-> **Estado: Fases 1, 2a, 2b y 3a de 5 (backend + infraestructura).**
+> **Estado: Fases 1, 2a, 2b, 3a y 3b de 5 (backend + infraestructura).**
 > Este ZIP incluye la base de la plataforma: multi-tenancy (un schema PostgreSQL por copropiedad), Flyway, JWT con refresh
 > rotativo, RBAC con permisos configurables por copropiedad, auditoría, gestión de usuarios/membresías con historial,
 > área de super admin, inmuebles (primer módulo de tenant), Swagger, seed, Docker, Nginx, PostgreSQL, Redis y MinIO.
@@ -13,7 +13,8 @@ Desarrollada por **CodeVam**. Nombre y empresa visibles configurables (`APP_NAME
 > paquetería, novedades de portería y un resumen operativo de seguridad.
 > La **Fase 3a** agrega la cartera: cargos, facturación masiva idempotente, imputación de pagos con orden configurable, pagos con
 > Idempotency-Key y reversión, notas crédito/débito, intereses de mora, saldo a favor, estados de cuenta y libro de movimientos inmutable (ver [docs/BILLING.md](docs/BILLING.md)).
-> **No incluye todavía**: conciliación bancaria, Wompi y certificados PDF (Fase 3b), PQRS, reservas, notificaciones por canal, documentos/fotos (Fases 4 y 5) ni el frontend.
+> La **Fase 3b** agrega la conciliación bancaria: importación CSV/XLSX asíncrona, perfiles de formato por banco, motor de coincidencias con puntaje y umbral configurable, detección de duplicados, revisión manual y reversión (ver [docs/BANK_RECONCILIATION.md](docs/BANK_RECONCILIATION.md)).
+> **No incluye todavía**: Wompi y certificados PDF (Fase 3c), PQRS, reservas, notificaciones por canal, documentos/fotos (Fases 4 y 5) ni el frontend.
 > Ver [docs/ROADMAP.md](docs/ROADMAP.md).
 >
 > **Importante:** este código fue escrito sin poder compilarlo ni ejecutarlo en el entorno donde se generó (sin Maven,
@@ -70,7 +71,7 @@ Con frontend (Fase 5): `docker compose --profile frontend up -d --build`.
 | Swagger UI | http://localhost:48124/swagger-ui.html |
 | Health | http://localhost:48124/actuator/health |
 
-Prueba rápida automática: en **PowerShell** `.\scripts\smoke-test.ps1` (puede requerir `Set-ExecutionPolicy -Scope Process Bypass`); en Git Bash/WSL `./scripts/smoke-test.sh` (solo cubre la Fase 1). El `.ps1` cubre Fases 1, 2a, 2b y 3a.
+Prueba rápida automática: en **PowerShell** `.\scripts\smoke-test.ps1` (puede requerir `Set-ExecutionPolicy -Scope Process Bypass`); en Git Bash/WSL `./scripts/smoke-test.sh` (solo cubre la Fase 1). El `.ps1` cubre Fases 1, 2a, 2b, 3a y 3b (la sección 10 usa `curl.exe`, incluido en Windows 10/11).
 
 ## Usuarios demo (solo desarrollo; contraseña = `APP_SEED_PASSWORD`, por defecto `Demo#2026!`)
 
@@ -119,6 +120,15 @@ curl -s -X POST $BASE/payments -H "Authorization: Bearer <token contador>" -H 'C
 curl -s "$BASE/billing/units/<id inmueble>/statement" -H "Authorization: Bearer <token contador>"
 ```
 Los cuerpos JSON siempre deben enviarse con `Content-Type: application/json` (también en POST sin datos: usa `{}`).
+
+### Conciliación bancaria (ejemplo)
+
+```bash
+curl -s -X POST $BASE/bank-reconciliation/imports -H "Authorization: Bearer <token contador>" \
+  -F "file=@extracto.csv;type=text/csv" -F "bankName=Bancolombia" -F "accountLabel=Cta 123"   # 202: se procesa en segundo plano
+curl -s $BASE/bank-reconciliation/imports/<id> -H "Authorization: Bearer <token contador>"      # QUEUED → PROCESSING → COMPLETED | FAILED
+curl -s "$BASE/bank-reconciliation/rows?importId=<id>&status=AMBIGUOUS" -H "Authorization: Bearer <token contador>"
+```
 
 ### Flujo con curl
 

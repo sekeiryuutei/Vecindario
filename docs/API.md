@@ -71,3 +71,52 @@ Flujo sin invitación: portero `POST /visitors/walk-in` → residente ve `GET /m
 
 POST `/payments`: 201 la primera vez, **200** con el mismo pago si se repite la `Idempotency-Key` (campo `replayed: true`), 409 `IDEMPOTENCY_KEY_REUSED` si la llave se reutiliza con otro monto/inmueble.
 Códigos: `CHARGE_ALREADY_EXISTS`, `CHARGE_HAS_PAYMENTS`, `CHARGE_ALREADY_VOIDED`, `ADJUSTMENT_NOT_ALLOWED`, `PAYMENT_ALREADY_REVERSED`, `INTEREST_DISABLED`, `INVALID_AMOUNT`, `INVALID_PAYMENT_DATE`, `INVALID_RUN`, `INVALID_ALLOCATION_ORDER`.
+
+## Fase 3b (conciliación bancaria)
+| Método y ruta | Permiso |
+|---|---|
+| POST `/bank-reconciliation/imports` (multipart: `file`, `bankName`, `accountLabel`, `profileId?`) → 202 | PAYMENTS_RECONCILE |
+| GET `/bank-reconciliation/imports` · GET `/bank-reconciliation/imports/{id}` | FINANCE_VIEW |
+| GET `/bank-reconciliation/rows?importId&status` · GET `/bank-reconciliation/rows/{id}` (candidatos + decisiones) | FINANCE_VIEW |
+| POST `/bank-reconciliation/rows/{id}/match` · `/reject` · `/revert` | PAYMENTS_RECONCILE |
+| GET/PUT `/bank-reconciliation/settings` | FINANCE_VIEW / FINANCE_MANAGE |
+| GET/POST `/bank-reconciliation/profiles` · PUT/DELETE `/bank-reconciliation/profiles/{id}` | FINANCE_VIEW / FINANCE_MANAGE |
+
+Estados de importación: `QUEUED → PROCESSING → COMPLETED | FAILED`. Estados de fila: `AUTO_MATCHED`, `MANUAL_REVIEW`, `MATCHED`, `REJECTED`, `DUPLICATE`, `AMBIGUOUS`, `IGNORED`.
+Códigos: `IMPORT_ALREADY_EXISTS` 409, `ROW_NOT_PENDING` 409, `ROW_NOT_APPLIED` 409, `UNSUPPORTED_FILE_TYPE` 400, `FILE_TOO_LARGE` 413, `IMPORT_QUEUE_FULL` 429, `INVALID_THRESHOLD` 400, `INVALID_PROFILE` 400, `PROFILE_NAME_EXISTS` 409.
+
+## Fase 3c (Wompi y Certificados PDF)
+| Método y ruta | Permiso / Auth |
+|---|---|
+| POST `/my/payments/online` | FINANCE_VIEW_OWN (crea intención Wompi con firma íntegra) |
+| POST `/public/payments/wompi/webhook` | Pública (valida checksum SHA-256 e idempotencia) |
+| GET `/public/certificates/verify/{code}` | Pública (validador de autenticidad de certificados PDF emitidos) |
+| GET `/my/certificates/clearance` · `/my/certificates/statement` · `/my/certificates/ownership` | FINANCE_VIEW_OWN / UNITS_VIEW_OWN (PDFs OpenPDF firmados digitalmente con hash) |
+| GET `/certificates/history` | FINANCE_VIEW |
+| PUT `/platform/tenants/{id}/features` | SUPER_ADMIN_PLATFORM (activa/desactiva feature flags por copropiedad) |
+
+## Fase 4 (Zonas Comunes, Reservas, PQRS, Comunicados, Notificaciones, Documentos, Asambleas)
+| Método y ruta | Permiso / Auth |
+|---|---|
+| GET/POST `/common-areas` · GET/PUT/DELETE `/common-areas/{id}` | COMMON_AREAS_MANAGE / RESERVATIONS_VIEW |
+| GET `/common-areas/{id}/availability?date=` | RESERVATIONS_VIEW / RESERVATIONS_VIEW_OWN |
+| POST/GET `/my/reservations` · POST `/my/reservations/{id}/cancel` | RESERVATIONS_MANAGE_OWN / RESERVATIONS_VIEW_OWN |
+| GET `/reservations` · POST `/reservations/{id}/approve` · `/reject` | RESERVATIONS_MANAGE |
+| POST/GET `/my/pqrs` · GET `/my/pqrs/{id}` · POST `/my/pqrs/{id}/messages` | PQR_VIEW_OWN |
+| GET `/pqrs` · GET `/pqrs/{id}` · POST `/pqrs/{id}/messages` · PATCH `/pqrs/{id}/status` | PQR_MANAGE |
+| GET `/pqrs/metrics/sla` | PQR_MANAGE |
+| POST/GET `/communications` · PATCH `/communications/{id}/publish` · `/archive` | COMMUNICATIONS_MANAGE |
+| GET `/my/communications` · POST `/my/communications/{id}/read` | COMMUNICATIONS_VIEW |
+| GET/PUT `/notifications/settings` | NOTIFICATIONS_MANAGE |
+| POST `/notifications/portfolio-reminders` | NOTIFICATIONS_MANAGE |
+| GET `/notifications/logs` | NOTIFICATIONS_MANAGE |
+| POST `/documents` (multipart: file, title, category, minimumRole) | DOCUMENTS_MANAGE |
+| GET `/documents` · DELETE `/documents/{id}` | DOCUMENTS_MANAGE |
+| GET `/my/documents` · GET `/my/documents/{id}/download` | DOCUMENTS_VIEW |
+| POST/GET `/assemblies` · GET/PATCH `/assemblies/{id}/status` | ASSEMBLIES_MANAGE / ASSEMBLIES_VIEW |
+| POST `/assemblies/{id}/check-in` · GET `/assemblies/{id}/quorum` | ASSEMBLIES_MANAGE / ASSEMBLIES_VIEW |
+| POST `/assemblies/{id}/topics` · GET `/assemblies/{id}/topics` | ASSEMBLIES_MANAGE / ASSEMBLIES_VIEW |
+| POST `/assemblies/topics/{id}/open-vote` · `/close-vote` | ASSEMBLIES_MANAGE |
+| GET `/assemblies/topics/{id}/results` | ASSEMBLIES_VIEW |
+| POST `/my/assemblies/topics/{id}/vote` | ASSEMBLIES_VOTE (ponderación por coeficiente Ley 675) |
+
