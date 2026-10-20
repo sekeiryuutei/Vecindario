@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,7 +48,7 @@ class PqrServiceTest {
         assertEquals(24, created.slaTargetHours());
         assertEquals(PqrStatus.OPEN, created.status());
 
-        long hoursBetween = Duration.between(Instant.now(), created.slaDueAt()).toHours();
+        long hoursBetween = Duration.between(created.createdAt(), created.slaDueAt()).toHours();
         assertEquals(24, hoursBetween);
     }
 

@@ -12,11 +12,12 @@ Cada fase se entrega como ZIP verificable. Las fases posteriores agregan migraci
 | 3b | Conciliación bancaria: CSV/XLSX asíncrono, perfiles por banco, matching con puntaje, revisión manual, duplicados, reversión | **Completada y verificada** |
 | 3c | Wompi (transacción, webhook con firma e idempotencia, feature flag ONLINE_PAYMENTS) y certificados PDF (paz y salvo, estado de cuenta, propiedad con OpenPDF) | **Completada y verificada** |
 | 4 | Zonas comunes y reservas (concurrencia, mora), PQRS/convivencia con SLA, comunicados, notificaciones multicanal, almacenamiento y documentos (StoragePort), asambleas y votación ponderada Ley 675 | **Completada y verificada** |
-| 5 | Mantenimiento y órdenes de trabajo, proveedores, presupuesto y ejecución de gastos, reportes (CSV/PDF), cámaras LPR desacopladas, frontend Angular+Ionic+Capacitor+PWA | **Backend completado y verificado (smoke tests 1-20)** |
+| 5 | Mantenimiento y órdenes de trabajo, proveedores, presupuesto y ejecución de gastos, reportes (CSV/PDF), cámaras LPR desacopladas | **Completada y verificada** |
+| 6 | Frontend Angular 20 + Ionic 8 + Capacitor 8 + PWA: portales de administración, portería, residente y plataforma; branding dinámico; guards por permisos; QR; Wompi; build Docker multi-stage | **Completada y verificada** |
 
 ## Pendientes conocidos de la Fase 1
-- Envío real de correo (hoy `LoggingAccountMailAdapter`; el SMTP llega con notificaciones).
-- Adaptador S3/MinIO (`StoragePort`): la infraestructura MinIO ya corre, el código llega con documentos.
+- Adaptador S3/MinIO opcional: la infraestructura existe bajo perfil `storage`; el modo por defecto es almacenamiento
+  local persistente.
 - Caché de permisos por rol (hoy se consultan por petición; correcto pero mejorable).
 - Endpoint para editar datos de la copropiedad (`TENANT_SETTINGS_MANAGE`).
 - Logging JSON estructurado (hoy: patrón con `traceId`).
@@ -42,3 +43,12 @@ Cada fase se entrega como ZIP verificable. Las fases posteriores agregan migraci
 - Los pesos de las señales son constantes documentadas (código 0,60 · documento 0,40 · nombre 0,25 · valor 0,25 · pagador conocido 0,30); el umbral, la brecha de ambigüedad y la aplicación automática sí son configurables.
 - Formatos: `.csv` y `.xlsx` (primera hoja). Los `.xls` antiguos y los extractos PDF no están soportados.
 - La cola de importaciones es interna al proceso (2 hilos, cola de 20); con varias réplicas del backend habría que moverla a Redis.
+
+## Pendientes conocidos de la Fase 6
+- Pruebas E2E de navegador (Playwright/Cypress) para los flujos críticos de los cuatro portales.
+- Notificaciones push nativas: la PWA usa service worker; Capacitor requiere integrar un proveedor push (FCM/APNs).
+- Firma y publicación en App Store/Google Play: los proyectos Android/iOS están incluidos, pero requieren credenciales y
+  cuentas de desarrollador.
+- Compilación nativa: requiere Android SDK/Android Studio y Xcode/CocoaPods; `cap:sync` exige `APP_PUBLIC_URL` HTTPS y
+  `APP_NAME` para fijar la API y el nombre visible. La cámara ya declara permisos en ambos proyectos.
+- El service worker cachea el shell y los assets; las respuestas de negocio se consultan siempre a la API.

@@ -1,37 +1,88 @@
 # Pruebas
 
-- `mvn test` → unitarios: `SchemaNames` (inyección), `TenantContext`, `JwtService` (firma, expiración, llave ajena,
-  secreto corto/dev en producción), política de contraseñas y tokens.
-- `mvn verify` → además `*IT` con PostgreSQL 16 real (Testcontainers; requiere Docker):
-  - `TenantIsolationIT`: filas solo en su schema; ignorar `tenantId`/`X-Tenant-Id`; GET por ID de otro tenant = 404;
-    `select-tenant` ajeno = 403; token válido con `tid` sin membresía = 403; JWT falsificado = 401; membresía revocada y
-    tenant suspendido surten efecto inmediato; residente sin acceso a inmuebles; auditoría acotada al tenant;
-    administrador de tenant no entra al área de plataforma.
-  - `AuthFlowIT`: error genérico, bloqueo tras 5 fallos, rotación y reutilización de refresh, logout, cambio de
-    contraseña, recuperación de un solo uso, invitación/activación, roles inválidos, no auto-modificarse, permisos
-    ajustados por copropiedad sin afectar a otra.
+## Comandos
 
-  - `VehicleAccessIT` (Fase 2a): vehículo dentro no se modifica ni elimina (admin ni residente) hasta registrar la salida; entrada duplicada,
-    vehículo bloqueado, placa desconocida y salida sin entrada se rechazan y generan alertas; **6 entradas simultáneas → exactamente 1**;
-    límites por tipo y por inmueble; placa única; el residente solo ve/toca lo suyo (404 en lo ajeno); el portero no ve personas;
-    personas, vehículos y eventos de un tenant son invisibles desde otro.
+```bash
+cd backend
+mvn -B clean test   # 101 pruebas unitarias (sin Docker)
+mvn -B verify       # unitarias + *IT con PostgreSQL real vía Testcontainers (requiere Docker)
 
-  - `VisitorsPackagesIT` (Fase 2b): QR de un solo uso (reutilizado, inválido, aún no vigente, cancelado, vencido con alerta, regenerado); **6 lecturas simultáneas
-    del mismo QR → exactamente 1 ingreso**; visitante sin invitación exige decisión del residente (otro residente recibe 404); rechazo bloquea el ingreso;
-    el QR de un tenant no sirve en otro; paquetes (ciclo, doble entrega, privacidad, aislamiento); novedades (cierre exige resolución, asignación solo a miembros activos)
-    y resumen de seguridad con permisos.
+cd ../frontend
+npm run build       # compilación estricta de Angular + service worker PWA
+```
 
-  - `BillingIT` (Fase 3a): el ejemplo de la especificación (Ordinaria 300.000 / Extraordinaria 150.000 / Intereses 50.000, pago de 300.000 → 50.000 / 150.000 / 100.000) y el cambio de orden;
-    idempotencia (reintento = mismo pago; **6 reintentos simultáneos → 1 solo pago**); **6 pagos simultáneos nunca sobrepagan** y el saldo a favor se aplica a cargos nuevos;
-    reversión de pagos y libro inmutable (UPDATE/DELETE rechazados, `CHECK` anti-sobrepago); anulaciones y notas crédito/débito; facturación masiva idempotente repartida por coeficiente;
-    intereses de mora (3% mensual, 30 días sobre 100.000 = 3.000) idempotentes por fecha; permisos (contador, consejo, secretaría, portero, propietario, arrendatario configurable)
-    y aislamiento entre copropiedades. Cada escenario verifica el **invariante**: saldo del libro = pendiente de cargos − saldo a favor.
-- Unitario `PaymentAllocatorTest`: orden configurable, antiguo/reciente primero, abonos parciales, sobrante y 300 casos aleatorios (jamás se asigna más de lo debido ni de lo pagado).
+Con el sistema levantado y seed activo:
 
-  - `ReconciliationIT` (Fase 3b): importación CSV real y asíncrona con 5 filas → 2 conciliadas automáticamente, 1 ambigua (con candidatos y señales), 1 a revisión, 1 egreso ignorado; segundo archivo solapado →
-    la fila repetida es DUPLICATE y **el pago no se aplica dos veces**; el mismo archivo se rechaza (409); conciliación manual idempotente; rechazo con motivo; reversión de una conciliación automática
-    (revierte el pago, deja la fila en revisión, se puede reconciliar de nuevo con un pago nuevo); decisiones inmutables; archivos inválidos terminan FAILED con mensaje legible; `.xlsx` real generado con POI;
-    perfil bancario personalizado (otro delimitador, formato de fecha y separador decimal); aplicación automática desactivable; permisos y aislamiento entre copropiedades.
-- Unitarios `StatementRowMapperTest` (comillas, BOM, Windows-1252, delimitadores, montos colombianos, filas inválidas) y `MatchingEngineTest` (señales, umbrales, ambigüedad, aprendizaje de pagadores).
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
+```
 
-Pendiente en fases siguientes: Wompi, certificados, reservas y E2E Playwright.
+El smoke test recorre salud, login multi-copropiedad, aislamiento, portería, visitantes, cartera, conciliación, Wompi,
+certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento, presupuesto y reportes.
+La app nativa se sincroniza con `APP_PUBLIC_URL` HTTPS y `APP_NAME`:
+
+```powershell
+$env:APP_PUBLIC_URL='https://app.ejemplo.com'
+$env:APP_NAME='Mi Copropiedad'
+npm run cap:sync
+```
+
+## Unitarias (101)
+
+- `SchemaNamesTest`, `TenantContextTest`: saneamiento de identificadores y contexto de tenant.
+- `JwtServiceTest`: firma, expiración, llave ajena, secreto corto o de desarrollo en producción.
+- `ProductionConfigValidatorTest`: aceptación de una configuración productiva completa y rechazo conjunto de URL
+  insegura, seed, Swagger, CORS local, secretos débiles, SMTP ausente, Wompi de pruebas y storage efímero.
+- `PublicConfigControllerTest`: configuración pública y manifest PWA con el nombre de marca configurado.
+- `PasswordPolicyAndTokensTest`: política de contraseñas y tokens opacos.
+- `DocumentServiceSecurityTest`: extensiones/MIME permitidos, path traversal y roles sin acceso.
+- `PlatformAdminBootstrapTest`: creación idempotente del primer superadministrador, rechazo de elevación de cuentas
+  operativas y validación de configuración.
+- `WompiServiceTest`, `WompiWebhookSecurityTest`: firma, comparación en tiempo constante, monto, referencia, idempotencia,
+  eventos desconocidos y selección del tenant antes de registrar el pago.
+- `PaymentAllocatorTest`: orden configurable, abonos parciales, sobrante y 300 casos aleatorios.
+- `StatementRowMapperTest`, `MatchingEngineTest`: parseo de extractos y motor de conciliación.
+- `ReservationServiceTest`, `PqrServiceTest`, `AssemblyServiceTest`, `BudgetServiceTest`, `MaintenanceServiceTest`,
+  `SupplierServiceTest`, `ReportServiceTest`, `CameraServiceTest`, `CertificatePdfTest`.
+
+## Integración (*IT)
+
+Requieren Docker. Usan un PostgreSQL 16 real compartido por `AbstractIntegrationTest`:
+
+- `TenantIsolationIT`: filas solo en su schema; ignorar `tenantId`/`X-Tenant-Id`; GET por ID de otro tenant = 404;
+  `select-tenant` ajeno = 403; token válido con `tid` sin membresía = 403; JWT falsificado = 401; membresía revocada y
+  tenant suspendido surten efecto inmediato; residente sin acceso a inmuebles; auditoría acotada al tenant;
+  administrador de tenant no entra al área de plataforma.
+- `AuthFlowIT`: error genérico, bloqueo tras 5 fallos, rotación y reutilización de refresh, logout, cambio de
+  contraseña, recuperación de un solo uso, invitación/activación, roles inválidos, no auto-modificarse y permisos
+  ajustados por copropiedad sin afectar a otra.
+- `VehicleAccessIT`: vehículo dentro no se modifica ni elimina hasta registrar la salida; entrada duplicada, vehículo
+  bloqueado, placa desconocida y salida sin entrada se rechazan y generan alertas; 6 entradas simultáneas → exactamente
+  1; límites por tipo e inmueble; placa única; el residente solo ve/toca lo suyo; aislamiento entre copropiedades.
+- `VisitorsPackagesIT`: QR de un solo uso, concurrencia (6 lecturas → 1 ingreso), autorización en tiempo real, paquetes,
+  novedades y resumen de seguridad con permisos y aislamiento.
+- `BillingIT`: ejemplo de imputación, idempotencia y concurrencia de pagos, reversión, libro inmutable, notas,
+  facturación masiva, intereses y permisos por rol.
+- `ReconciliationIT`: CSV real asíncrono, coincidencias, ambiguas, duplicados, revisión manual, reversión, perfiles
+  bancarios, archivos inválidos y aislamiento.
+
+Las asambleas, reservas, PQRS, presupuesto, mantenimiento, proveedores, reportes y certificados cuentan con pruebas
+unitarias; sus flujos HTTP completos se validan en el smoke test.
+
+## Frontend
+
+`npm run build` valida plantillas estrictas, rutas, guards, tipado de modelos, PWA y presupuesto de bundles.
+`APP_PUBLIC_URL=... APP_NAME=... npm run cap:sync` valida además la sincronización Android/iOS y escribe la API absoluta
+en `runtime-config.json`. Las pruebas end-to-end de navegador (Playwright) quedan como siguiente mejora de calidad; no
+forman parte del pipeline actual.
+
+## Verificación de producción
+
+Se validó un arranque limpio con `SPRING_PROFILES_ACTIVE=production`, PostgreSQL y Redis nuevos, sin seed: health `UP`,
+Flyway hasta `V10`, `/v3/api-docs` con `404`, cero tenants y usuarios. `ProductionConfigValidatorTest` cubre la
+aceptación de una configuración completa y el rechazo de URL insegura, seed, Swagger, CORS local, secretos débiles,
+SMTP ausente, Wompi de pruebas y storage efímero.
+
+También se verificó CORS real: preflight desde `https://localhost` y `capacitor://localhost` devuelve
+`Access-Control-Allow-Origin`; un origen `http://localhost:3000` se rechaza. `npm audit --omit=dev` no reporta
+vulnerabilidades de runtime.

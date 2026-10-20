@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Portal de copropiedad</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Administración de copropiedades, portería y portal del residente">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="color-scheme" content="light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Copropiedad">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <style>
+    html, body { height: 100%; margin: 0; background: #f1f5f9; }
+    app-root { display: block; min-height: 100%; }
+    .boot { position: fixed; inset: 0; display: grid; place-items: center; background: #0f172a; }
+    .boot-mark { width: 64px; height: 64px; border-radius: 20px; background: #0f766e; display: grid; place-items: center; }
+  </style>
+</head>
+<body>
+  <app-root>
+    <div class="boot">
+      <div class="boot-mark" role="img" aria-label="Cargando">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 11.5 12 4l9 7.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5.5 10.5V20h13v-9.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9.5 20v-5h5v5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </app-root>
+</body>
+</html>

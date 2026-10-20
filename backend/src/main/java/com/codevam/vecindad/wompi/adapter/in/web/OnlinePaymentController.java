@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +24,7 @@ public class OnlinePaymentController {
     public record CreateIntentRequest(
             @NotNull UUID unitId,
             @NotNull @DecimalMin("1000") BigDecimal amount,
-            String notes
+            @Size(max = 300) String notes
     ) {}
 
     private final WompiService wompi;

@@ -55,7 +55,9 @@ public class ReservationService {
 
     @Transactional
     public Reservation createReservation(UUID userId, CreateReservationCommand cmd) {
-        CommonArea area = commonAreaPort.findById(cmd.commonAreaId())
+        // El bloqueo por zona serializa las reservas concurrentes. Sin él, dos
+        // peticiones pueden ver la franja libre y ambas insertar.
+        CommonArea area = commonAreaPort.lockById(cmd.commonAreaId())
                 .orElseThrow(() -> ApiException.notFound("Zona común no encontrada."));
         if (!area.isActive()) {
             throw ApiException.conflict("COMMON_AREA_INACTIVE", "La zona común se encuentra inactiva o en mantenimiento.");

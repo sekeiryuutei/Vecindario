@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -39,6 +40,9 @@ import java.util.UUID;
 
 @Service
 public class CertificateService {
+
+    private static final char[] BASE32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     public record CertificateDownload(byte[] pdfBytes, String filename, String verificationCode) {}
 
@@ -153,6 +157,9 @@ public class CertificateService {
     }
 
     public CertificateVerification verifyPublic(String code) {
+        if (code == null || code.isBlank() || code.length() > 50) {
+            throw ApiException.notFound("El certificado no existe o el código es inválido.");
+        }
         return certs.findGlobalVerification(code.trim().toUpperCase())
                 .orElseThrow(() -> ApiException.notFound("El certificado no existe o el código es inválido."));
     }
@@ -215,13 +222,30 @@ public class CertificateService {
     }
 
     private String generateCode(String prefix) {
-        String random = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        byte[] bytes = new byte[16];
+        RANDOM.nextBytes(bytes);
+        StringBuilder random = new StringBuilder(26);
+        int buffer = 0;
+        int bits = 0;
+        for (byte b : bytes) {
+            buffer = (buffer << 8) | (b & 0xff);
+            bits += 8;
+            while (bits >= 5) {
+                random.append(BASE32[(buffer >> (bits - 5)) & 31]);
+                bits -= 5;
+            }
+        }
+        if (bits > 0) {
+            random.append(BASE32[(buffer << (5 - bits)) & 31]);
+        }
         return prefix + "-" + LocalDate.now().getYear() + "-" + random;
     }
 
     private String buildVerifyUrl(String code) {
-        String base = props.isProduction() ? "https://vecindad.codevam.com" : "http://localhost:48124";
-        return base + "/api/v1/public/certificates/verify/" + code;
+        String base = props.publicUrl() == null || props.publicUrl().isBlank()
+                ? "http://localhost:48124"
+                : props.publicUrl().replaceAll("/+$", "");
+        return base + "/verificar-certificado/" + code;
     }
 
     private static String sha256Bytes(byte[] bytes) {

@@ -4,7 +4,6 @@ import com.codevam.vecindad.audit.application.AuditService;
 import com.codevam.vecindad.billing.application.port.out.BillingPort;
 import com.codevam.vecindad.billing.application.port.out.BillingSettingsPort;
 import com.codevam.vecindad.billing.domain.*;
-import com.codevam.vecindad.properties.application.port.out.PropertyUnitPort;
 import com.codevam.vecindad.shared.error.ApiException;
 import com.codevam.vecindad.shared.model.PageResult;
 import com.codevam.vecindad.shared.model.Paging;
@@ -38,17 +37,15 @@ public class PaymentService {
     private final BillingSettingsPort settings;
     private final PaymentApplication application;
     private final FinanceTx tx;
-    private final PropertyUnitPort units;
     private final AuditService audit;
     private final Clock clock;
 
     public PaymentService(BillingPort billing, BillingSettingsPort settings, PaymentApplication application, FinanceTx tx,
-                          PropertyUnitPort units, AuditService audit, Clock clock) {
+                          AuditService audit, Clock clock) {
         this.billing = billing;
         this.settings = settings;
         this.application = application;
         this.tx = tx;
-        this.units = units;
         this.audit = audit;
         this.clock = clock;
     }
@@ -70,13 +67,16 @@ public class PaymentService {
         if (date.isAfter(today)) {
             throw ApiException.badRequest("INVALID_PAYMENT_DATE", "La fecha del pago no puede estar en el futuro.");
         }
-        units.findActiveById(c.unitId()).orElseThrow(() -> ApiException.notFound("El inmueble no existe."));
         UUID actor = CurrentUser.get().map(AuthenticatedUser::userId).orElse(null);
         String source = c.source() == null ? "MANUAL" : c.source();
         UUID id = UUID.randomUUID();
 
         PaymentResult result = tx.run(() -> {
-            billing.lockUnit(c.unitId());
+            // El bloqueo y la validación del inmueble comparten la misma transacción JDBC.
+            // Así también funciona en procesos internos (webhooks) con tenant explícito.
+            if (!billing.lockUnit(c.unitId())) {
+                throw ApiException.notFound("El inmueble no existe.");
+            }
             if (idempotencyKey != null) {
                 var existing = billing.findPaymentByKey(idempotencyKey);
                 if (existing.isPresent()) return replay(existing.get(), c.unitId(), amount);

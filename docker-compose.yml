@@ -1,5 +1,11 @@
 name: vecindad
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   vecindad_postgresql:
     image: postgres:16-alpine
@@ -19,6 +25,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     networks:
       vecindad_net:
         aliases: [postgres]
@@ -39,12 +48,15 @@ services:
       retries: 20
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     networks:
       vecindad_net:
         aliases: [redis]
 
-  # OPCIONAL (profile "storage"): MinIO ya no se distribuye en Docker Hub ni en Quay sin credenciales.
-  # El almacenamiento S3 no se usa hasta la fase de documentos; se elegirá entonces un servidor S3 compatible.
+  # OPCIONAL (perfil "storage"): servidor S3 compatible para quienes no usan
+  # almacenamiento local. El backend usa STORAGE_LOCAL_DIR por defecto.
   vecindad_minio:
     profiles: ["storage"]
     image: quay.io/minio/minio:latest
@@ -64,11 +76,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    logging: *default-logging
     networks:
       vecindad_net:
         aliases: [minio]
 
-  # Crea el bucket privado una sola vez y termina.
   vecindad_minio_init:
     profiles: ["storage"]
     image: quay.io/minio/mc:latest
@@ -87,6 +99,7 @@ services:
       mc anonymous set none local/$${AWS_S3_BUCKET};
       exit 0;
       "
+    logging: *default-logging
     networks:
       - vecindad_net
 
@@ -107,6 +120,7 @@ services:
       APP_NAME: ${APP_NAME:-Vecindad}
       APP_COMPANY: ${APP_COMPANY:-CodeVam}
       APP_ENV: ${APP_ENV:-development}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:48124}
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env (mínimo 32 caracteres)}
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
@@ -122,7 +136,22 @@ services:
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
       APP_SEED_ENABLED: ${APP_SEED_ENABLED:-false}
       APP_SEED_PASSWORD: ${APP_SEED_PASSWORD:-Demo#2026!}
+      APP_BOOTSTRAP_EMAIL: ${APP_BOOTSTRAP_EMAIL:-}
+      APP_BOOTSTRAP_PASSWORD: ${APP_BOOTSTRAP_PASSWORD:-}
+      APP_BOOTSTRAP_NAME: ${APP_BOOTSTRAP_NAME:-Administrador de plataforma}
       MAIL_DEV_LOG_LINKS: ${MAIL_DEV_LOG_LINKS:-false}
+      MAIL_HEALTH_ENABLED: ${MAIL_HEALTH_ENABLED:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@localhost}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      STORAGE_LOCAL_DIR: /app/storage
+      TOKEN_CLEANUP_CRON: ${TOKEN_CLEANUP_CRON:-0 30 3 * * *}
+      TOKEN_RETENTION_DAYS: ${TOKEN_RETENTION_DAYS:-30}
+      WOMPI_ENABLED: ${WOMPI_ENABLED:-true}
       WOMPI_PUBLIC_KEY: ${WOMPI_PUBLIC_KEY:-}
       WOMPI_PRIVATE_KEY: ${WOMPI_PRIVATE_KEY:-}
       WOMPI_EVENTS_SECRET: ${WOMPI_EVENTS_SECRET:-}
@@ -131,28 +160,45 @@ services:
       WOMPI_REDIRECT_URL: ${WOMPI_REDIRECT_URL:-}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-48121}:8080"
+    volumes:
+      - vecindad_storage:/app/storage
+    tmpfs:
+      - /tmp:size=64m
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/actuator/health | grep -q UP || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 18
-      start_period: 60s
+      start_period: 90s
+    logging: *default-logging
     networks:
       vecindad_net:
         aliases: [backend]
 
-  # Solo se levanta con:  docker compose --profile frontend up -d --build
-  # Requiere haber descomprimido vecindad-frontend.zip en ./frontend
   vecindad_frontend:
-    profiles: ["frontend"]
     build:
       context: ./frontend
       dockerfile: ../docker/frontend/Dockerfile
     image: vecindad/frontend:local
     container_name: vecindad_frontend
     restart: unless-stopped
+    depends_on:
+      vecindad_backend:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-48120}:80"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
     networks:
       vecindad_net:
         aliases: [frontend]
@@ -164,15 +210,20 @@ services:
     depends_on:
       vecindad_backend:
         condition: service_healthy
+      vecindad_frontend:
+        condition: service_healthy
     ports:
       - "${NGINX_PORT:-48124}:80"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/healthz || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
+    logging: *default-logging
     networks:
       - vecindad_net
 
@@ -184,3 +235,4 @@ volumes:
   vecindad_postgres_data:
   vecindad_redis_data:
   vecindad_minio_data:
+  vecindad_storage:

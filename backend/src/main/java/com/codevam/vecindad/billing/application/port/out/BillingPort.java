@@ -11,8 +11,11 @@ import java.util.UUID;
 
 /** Persistencia financiera. Los métodos de escritura deben ejecutarse dentro de FinanceTx con el inmueble bloqueado. */
 public interface BillingPort {
-    /** Serializa toda la actividad financiera de un inmueble (SELECT ... FOR UPDATE). */
-    void lockUnit(UUID unitId);
+    /**
+     * Serializa toda la actividad financiera de un inmueble (SELECT ... FOR UPDATE).
+     * Devuelve false cuando el inmueble no existe en el tenant activo.
+     */
+    boolean lockUnit(UUID unitId);
 
     // ---- cargos
     Optional<Charge> findCharge(UUID id);

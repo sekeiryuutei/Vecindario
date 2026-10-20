@@ -77,6 +77,12 @@ public class JdbcCommonAreaAdapter implements CommonAreaPort {
     }
 
     @Override
+    public Optional<CommonArea> lockById(UUID id) {
+        return t.jdbc().query(t.q("SELECT " + COLS + " FROM {s}.common_areas WHERE id = ? FOR UPDATE"), MAPPER, id)
+                .stream().findFirst();
+    }
+
+    @Override
     public List<CommonArea> list(boolean onlyActive) {
         String sql = "SELECT " + COLS + " FROM {s}.common_areas " + (onlyActive ? "WHERE is_active = true " : "") + "ORDER BY name ASC";
         return t.jdbc().query(t.q(sql), MAPPER);

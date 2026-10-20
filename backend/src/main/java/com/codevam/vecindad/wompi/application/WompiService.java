@@ -19,14 +19,16 @@ import com.codevam.vecindad.wompi.domain.OnlinePaymentIntent;
 import com.codevam.vecindad.wompi.domain.WompiEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +36,7 @@ import java.util.UUID;
 @Service
 public class WompiService {
     private static final Logger log = LoggerFactory.getLogger(WompiService.class);
+    private static final String CHECKOUT_URL = "https://checkout.wompi.co/p/";
 
     public record IntentResponse(
             String reference,
@@ -71,6 +74,7 @@ public class WompiService {
     public IntentResponse createIntent(UUID unitId, BigDecimal amount, String notes) {
         AuthenticatedUser me = CurrentUser.requireTenant();
         UUID tenantId = me.tenantId();
+        requireConfigured();
 
         Map<String, Boolean> features = tenants.features(tenantId);
         if (!Boolean.TRUE.equals(features.get("ONLINE_PAYMENTS"))) {
@@ -92,10 +96,7 @@ public class WompiService {
         String prefix = slug.substring(0, Math.min(6, slug.length())).toUpperCase();
         String reference = "WP-" + prefix + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
 
-        String integritySecret = props.wompi() != null && props.wompi().integritySecret() != null
-                ? props.wompi().integritySecret() : "";
-        String rawToSign = reference + amountInCents + "COP" + integritySecret;
-        String signature = sha256(rawToSign);
+        String signature = sha256(reference + amountInCents + "COP" + props.wompi().integritySecret());
 
         OnlinePaymentIntent intent = new OnlinePaymentIntent(
                 UUID.randomUUID(), reference, tenantId, unitId, me.userId(),
@@ -107,43 +108,48 @@ public class WompiService {
         audit.log(tenantId, "ONLINE_PAYMENT_INTENT_CREATED", "ONLINE_PAYMENT", reference, true,
                 Map.of("unitId", unitId.toString(), "amount", validatedAmount.toString()));
 
-        String pubKey = props.wompi() != null && props.wompi().publicKey() != null ? props.wompi().publicKey() : "";
-        String redirectUrl = props.wompi() != null && props.wompi().redirectUrl() != null ? props.wompi().redirectUrl() : "";
-        String checkoutUrl = "https://checkout.wompi.co/p/?public-key=" + pubKey
-                + "&currency=COP&amount-in-cents=" + amountInCents
-                + "&reference=" + reference
-                + "&signature:integrity=" + signature
-                + (redirectUrl.isBlank() ? "" : "&redirect-url=" + redirectUrl);
+        String redirectUrl = props.wompi().redirectUrl() == null ? "" : props.wompi().redirectUrl().trim();
+        UriComponentsBuilder checkout = UriComponentsBuilder.fromHttpUrl(CHECKOUT_URL)
+                .queryParam("public-key", props.wompi().publicKey())
+                .queryParam("currency", "COP")
+                .queryParam("amount-in-cents", amountInCents)
+                .queryParam("reference", reference)
+                .queryParam("signature:integrity", signature);
+        if (!redirectUrl.isBlank()) {
+            checkout.queryParam("redirect-url", redirectUrl);
+        }
 
-        return new IntentResponse(reference, amountInCents, "COP", signature, pubKey, checkoutUrl, redirectUrl, "PENDING");
+        return new IntentResponse(reference, amountInCents, "COP", signature, props.wompi().publicKey(),
+                checkout.build().encode().toUriString(), redirectUrl, "PENDING");
     }
 
+    /**
+     * Procesa el evento público de Wompi. La firma es obligatoria en producción;
+     * en desarrollo puede omitirse solo cuando no hay secreto configurado.
+     *
+     * No se abre una transacción JPA aquí: el webhook llega sin tenant y la
+     * transacción debe iniciarse DESPUÉS de activar el contexto del tenant para
+     * que Hibernate resuelva su search_path. PaymentService abre su propia
+     * transacción JDBC (FinanceTx) con el tenant ya establecido.
+     */
     public void processWebhook(WompiEvent event) {
         if (event == null || event.data() == null || event.data().transaction() == null) {
             throw ApiException.badRequest("INVALID_PAYLOAD", "Estructura del evento Wompi no válida.");
         }
-
         var tx = event.data().transaction();
+        if (tx.reference() == null || tx.reference().isBlank()) {
+            throw ApiException.badRequest("INVALID_PAYLOAD", "El evento no contiene una referencia de pago.");
+        }
+        if (event.event() != null && !"transaction.updated".equalsIgnoreCase(event.event())) {
+            log.info("Evento Wompi ignorado: {}", event.event());
+            return;
+        }
 
-        // Verificación de checksum si eventsSecret está configurado
-        if (props.wompi() != null && props.wompi().eventsSecret() != null
-                && !props.wompi().eventsSecret().isBlank() && event.signature() != null
-                && event.signature().properties() != null && !event.signature().properties().isEmpty()) {
-            StringBuilder sb = new StringBuilder();
-            for (String prop : event.signature().properties()) {
-                if ("transaction.id".equals(prop)) sb.append(tx.id());
-                else if ("transaction.status".equals(prop)) sb.append(tx.status());
-                else if ("transaction.amount_in_cents".equals(prop)) sb.append(tx.amountInCents());
-            }
-            if (event.timestamp() != null) sb.append(event.timestamp());
-            sb.append(props.wompi().eventsSecret());
+        verifySignature(event);
 
-            String expected = sha256(sb.toString());
-            if (!expected.equalsIgnoreCase(event.signature().checksum())) {
-                log.warn("Firma de webhook Wompi inválida para tx {}. Recibida: {}, esperada: {}",
-                        tx.id(), event.signature().checksum(), expected);
-                throw ApiException.badRequest("INVALID_SIGNATURE", "Firma del evento inválida.");
-            }
+        if (props.isProduction() && event.environment() != null && !event.environment().isBlank()
+                && !"prod".equalsIgnoreCase(event.environment())) {
+            throw ApiException.badRequest("INVALID_ENVIRONMENT", "El evento no proviene del entorno productivo de Wompi.");
         }
 
         Optional<OnlinePaymentIntent> opt = onlinePayments.findByReference(tx.reference());
@@ -158,54 +164,165 @@ public class WompiService {
             return;
         }
 
-        if ("APPROVED".equalsIgnoreCase(tx.status())) {
+        String status = tx.status() == null ? "" : tx.status().toUpperCase();
+        if ("APPROVED".equals(status)) {
+            validateApprovedTransaction(tx, intent);
             Tenant tenant = tenants.findById(intent.tenantId()).orElseThrow();
-            BigDecimal amount = BigDecimal.valueOf(tx.amountInCents()).divide(BigDecimal.valueOf(100));
+            BigDecimal amount = BigDecimal.valueOf(intent.amountInCents()).divide(BigDecimal.valueOf(100));
             TenantRef ref = new TenantRef(tenant.id(), tenant.schemaName());
 
-            PaymentService.PaymentResult res = TenantContext.callAs(ref, () ->
-                    payments.register(new PaymentService.RegisterCommand(
-                            intent.unitId(), amount, Money.today(clock), PaymentMethod.WOMPI, "WOMPI",
-                            tx.reference(), "Pago Wompi", "Aprobado por Wompi transacción " + tx.id()
-                    ), "wompi-" + tx.id())
-            );
+            PaymentService.PaymentResult res = TenantContext.callAs(ref, () -> {
+                // Relectura dentro del tenant: si otro webhook ya lo procesó,
+                // se evita registrar un segundo pago (además de la llave
+                // idempotente wompi-<txId> que protege la carrera).
+                OnlinePaymentIntent current = onlinePayments.findByReference(tx.reference()).orElseThrow();
+                if (current.status() == OnlinePaymentIntent.IntentStatus.APPROVED) {
+                    return null;
+                }
+                PaymentService.PaymentResult registered = payments.register(new PaymentService.RegisterCommand(
+                        intent.unitId(), amount, Money.today(clock), PaymentMethod.WOMPI, "WOMPI",
+                        tx.reference(), "Pago Wompi", "Aprobado por Wompi transacción " + tx.id()
+                ), "wompi-" + tx.id());
+                Long fee = tx.fee() != null ? tx.fee().amountInCents() : null;
+                onlinePayments.updateStatus(tx.reference(), OnlinePaymentIntent.IntentStatus.APPROVED,
+                        tx.id(), tx.paymentMethodType(), fee, registered.payment().id(), null);
+                return registered;
+            });
 
-            Long fee = tx.fee() != null ? tx.fee().amountInCents() : null;
-            onlinePayments.updateStatus(tx.reference(), OnlinePaymentIntent.IntentStatus.APPROVED,
-                    tx.id(), tx.paymentMethodType(), fee, res.payment().id(), null);
-
+            if (res == null) {
+                log.info("Evento Wompi ya procesado durante la transacción: {}", tx.reference());
+                return;
+            }
             audit.log(intent.tenantId(), "ONLINE_PAYMENT_APPROVED", "ONLINE_PAYMENT", tx.reference(), true,
                     Map.of("wompiTxId", tx.id(), "amount", amount.toString(), "paymentId", res.payment().id().toString()));
-        } else {
-            OnlinePaymentIntent.IntentStatus newStatus;
-            try {
-                newStatus = OnlinePaymentIntent.IntentStatus.valueOf(tx.status().toUpperCase());
-            } catch (Exception e) {
-                newStatus = OnlinePaymentIntent.IntentStatus.ERROR;
-            }
-            onlinePayments.updateStatus(tx.reference(), newStatus, tx.id(), tx.paymentMethodType(),
-                    null, null, tx.statusMessage());
-
-            audit.log(intent.tenantId(), "ONLINE_PAYMENT_" + newStatus.name(), "ONLINE_PAYMENT", tx.reference(), false,
-                    Map.of("wompiTxId", tx.id() != null ? tx.id() : ""));
+            return;
         }
+
+        OnlinePaymentIntent.IntentStatus newStatus;
+        try {
+            newStatus = OnlinePaymentIntent.IntentStatus.valueOf(status);
+        } catch (Exception e) {
+            newStatus = OnlinePaymentIntent.IntentStatus.ERROR;
+        }
+        if (newStatus == OnlinePaymentIntent.IntentStatus.PENDING) {
+            return;
+        }
+        onlinePayments.updateStatus(tx.reference(), newStatus, tx.id(), tx.paymentMethodType(),
+                null, null, tx.statusMessage());
+
+        audit.log(intent.tenantId(), "ONLINE_PAYMENT_" + newStatus.name(), "ONLINE_PAYMENT", tx.reference(), false,
+                Map.of("wompiTxId", tx.id() != null ? tx.id() : ""));
     }
 
     public Optional<OnlinePaymentIntent> getIntent(String reference) {
-        return onlinePayments.findByReference(reference);
+        AuthenticatedUser me = CurrentUser.requireTenant();
+        Optional<OnlinePaymentIntent> found = onlinePayments.findByReference(reference);
+        if (found.isEmpty() || !me.tenantId().equals(found.get().tenantId())) {
+            return Optional.empty();
+        }
+        OnlinePaymentIntent intent = found.get();
+        if (!me.userId().equals(intent.userId()) && !me.hasPermission("FINANCE_VIEW")) {
+            return Optional.empty();
+        }
+        return found;
+    }
+
+    private void requireConfigured() {
+        AppProperties.Wompi w = props.wompi();
+        if (w == null || !w.enabled()) {
+            throw ApiException.badRequest("ONLINE_PAYMENTS_DISABLED", "Los pagos en línea están deshabilitados.");
+        }
+        if (blank(w.publicKey()) || blank(w.privateKey()) || blank(w.integritySecret())) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "ONLINE_PAYMENTS_NOT_CONFIGURED",
+                    "La pasarela de pagos no está configurada. Contacta a la administración.");
+        }
+    }
+
+    private void verifySignature(WompiEvent event) {
+        AppProperties.Wompi w = props.wompi();
+        boolean secretConfigured = w != null && !blank(w.eventsSecret());
+        WompiEvent.WompiSignature signature = event.signature();
+
+        if (!secretConfigured) {
+            if (props.isProduction()) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_SIGNATURE",
+                        "El webhook no tiene configurado el secreto de eventos.");
+            }
+            log.warn("WOMPI_EVENTS_SECRET no configurado: se omite la verificación de firma fuera de producción.");
+            return;
+        }
+
+        if (signature == null || blank(signature.checksum()) || signature.properties() == null
+                || signature.properties().isEmpty()) {
+            if (!props.isProduction()) {
+                log.warn("Evento Wompi sin firma en desarrollo: se omite la verificación.");
+                return;
+            }
+            throw ApiException.badRequest("INVALID_SIGNATURE", "El evento no contiene firma.");
+        }
+        if (event.timestamp() == null) {
+            throw ApiException.badRequest("INVALID_SIGNATURE", "El evento no contiene timestamp.");
+        }
+
+        var tx = event.data().transaction();
+        StringBuilder raw = new StringBuilder();
+        for (String property : signature.properties()) {
+            String value = transactionProperty(tx, property);
+            if (value == null) {
+                throw ApiException.badRequest("INVALID_SIGNATURE", "Propiedad de firma no soportada: " + property);
+            }
+            raw.append(value);
+        }
+        raw.append(event.timestamp()).append(w.eventsSecret());
+
+        String expected = sha256(raw.toString());
+        byte[] expectedBytes = expected.getBytes(StandardCharsets.US_ASCII);
+        byte[] receivedBytes = signature.checksum().trim().toLowerCase().getBytes(StandardCharsets.US_ASCII);
+        if (!MessageDigest.isEqual(expectedBytes, receivedBytes)) {
+            log.warn("Firma de webhook Wompi inválida para tx {}.", tx.id());
+            throw ApiException.badRequest("INVALID_SIGNATURE", "Firma del evento inválida.");
+        }
+    }
+
+    private String transactionProperty(WompiEvent.WompiTransaction tx, String property) {
+        return switch (property) {
+            case "transaction.id" -> tx.id();
+            case "transaction.status" -> tx.status();
+            case "transaction.amount_in_cents" -> tx.amountInCents() == null ? null : tx.amountInCents().toString();
+            case "transaction.currency" -> tx.currency();
+            case "transaction.reference" -> tx.reference();
+            case "transaction.payment_method_type" -> tx.paymentMethodType();
+            case "transaction.status_message" -> tx.statusMessage();
+            default -> null;
+        };
+    }
+
+    private void validateApprovedTransaction(WompiEvent.WompiTransaction tx, OnlinePaymentIntent intent) {
+        if (tx.id() == null || tx.id().isBlank()) {
+            throw ApiException.badRequest("INVALID_PAYLOAD", "La transacción aprobada no contiene identificador.");
+        }
+        if (tx.amountInCents() == null || tx.amountInCents() != intent.amountInCents()) {
+            log.warn("Monto Wompi no coincide para {}: evento={}, intención={}",
+                    tx.reference(), tx.amountInCents(), intent.amountInCents());
+            throw ApiException.badRequest("AMOUNT_MISMATCH", "El monto del evento no coincide con la intención de pago.");
+        }
+        if (tx.currency() != null && !intent.currency().equalsIgnoreCase(tx.currency())) {
+            throw ApiException.badRequest("CURRENCY_MISMATCH", "La moneda del evento no coincide con la intención de pago.");
+        }
+        if (intent.status() != OnlinePaymentIntent.IntentStatus.PENDING) {
+            throw ApiException.conflict("INTENT_NOT_PENDING", "La intención de pago ya no está pendiente.");
+        }
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 
     public static String sha256(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
+            return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             throw new RuntimeException("Error calculando SHA-256", e);
         }

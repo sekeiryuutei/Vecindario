@@ -8,7 +8,16 @@ Get-Content .env | Where-Object { $_ -match '^\s*[A-Za-z_][A-Za-z0-9_]*=' } | Fo
 $port = if ($envMap['NGINX_PORT']) { $envMap['NGINX_PORT'] } else { '48124' }
 $pass = if ($envMap['APP_SEED_PASSWORD']) { $envMap['APP_SEED_PASSWORD'] } else { 'Demo#2026!' }
 $base = "http://localhost:$port/api/v1"
+$runId = [guid]::NewGuid().ToString('N').Substring(0, 8)
 $fails = 0
+
+function Sha256Hex([string]$value) {
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($value)
+    return (([BitConverter]::ToString($sha.ComputeHash($bytes)) -replace '-', '')).ToLowerInvariant()
+  } finally { $sha.Dispose() }
+}
 
 function Call($method, $path, $token = $null, $body = $null, $extra = @{}) {
   $h = @{}; if ($token) { $h['Authorization'] = "Bearer $token" }
@@ -187,6 +196,8 @@ $wpRef = $wpReq.Json.reference
 $wpStatus = Call GET "/my/payments/online/$wpRef" $ot
 Check 'intencion en estado PENDING' ($wpStatus.Status -eq 200 -and $wpStatus.Json.status -eq 'PENDING')
 
+$wpTimestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+$wpChecksum = Sha256Hex("tx-$wpRef" + "APPROVED" + "2500000" + "COP" + "$wpTimestamp" + "$($envMap['WOMPI_EVENTS_SECRET'])")
 $wpEvt = @{
   event = 'transaction.updated'
   data = @{
@@ -200,6 +211,12 @@ $wpEvt = @{
       fee = @{ amount_in_cents = 120000 }
     }
   }
+  environment = 'test'
+  signature = @{
+    properties = @('transaction.id', 'transaction.status', 'transaction.amount_in_cents', 'transaction.currency')
+    checksum = $wpChecksum
+  }
+  timestamp = $wpTimestamp
 }
 $hook = Call POST '/public/wompi/events' $null $wpEvt
 Check 'webhook Wompi procesado (200)' ($hook.Status -eq 200)
@@ -410,8 +427,8 @@ Check 'proveedores demo consultados' ($sups.Status -eq 200 -and $sups.Json.total
 $demoSup = $sups.Json.content[0]
 
 $newSup = Call POST '/suppliers' $admin @{
-  taxId = "901999888-$((Get-Random -Minimum 1 -Maximum 9))"
-  name = "Jardines y Paisajismo S.A.S. $((Get-Random))"
+  taxId = "SMOKE-$runId"
+  name = "Jardines y Paisajismo S.A.S. $runId"
   contactName = 'Pedro Pérez'
   contactPhone = '3119998877'
   contactEmail = 'jardines@valle.local'
@@ -426,7 +443,7 @@ $contracts = Call GET "/suppliers/$($demoSup.id)/contracts" $admin
 Check 'contratos de proveedor demo consultados' ($contracts.Status -eq 200 -and @($contracts.Json).Count -ge 1)
 
 $newCtr = Call POST "/suppliers/$newSupId/contracts" $admin @{
-  contractNumber = "CTR-JAR-$((Get-Random))"
+  contractNumber = "CTR-JAR-$runId"
   title = 'Mantenimiento mensual jardines'
   description = 'Poda de césped y ornato mensual'
   startDate = (Get-Date).ToString("yyyy-MM-dd")

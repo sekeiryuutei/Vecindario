@@ -10,6 +10,7 @@ Swagger UI: `/swagger-ui.html` · OpenAPI JSON: `/v3/api-docs`. Paginación: `?p
 | POST `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password` | pública |
 | POST `/auth/select-tenant`, `/auth/change-password` · GET `/auth/me` | token |
 | GET `/public/config` | pública |
+| GET `/public/manifest.webmanifest` | pública (manifest PWA con `APP_NAME`) |
 | GET `/tenants/current` | miembro |
 | GET/POST `/tenant-members` · PATCH `/tenant-members/{id}/role` · POST `…/suspend`, `…/activate` · DELETE `…/{id}` · GET `…/{id}/history` | USERS_VIEW / USERS_MANAGE |
 | GET `/roles`, `/roles/permissions` · PUT `/roles/{rol}/permissions/{perm}` | ROLES_MANAGE |

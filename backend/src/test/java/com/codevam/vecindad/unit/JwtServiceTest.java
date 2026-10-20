@@ -17,11 +17,15 @@ class JwtServiceTest {
     private static final String SECRET = "unit-test-secret-unit-test-secret-1234567890";
 
     private static AppProperties props(String secret, String env) {
-        return new AppProperties("Vecindad", "CodeVam", env, new AppProperties.Mail(false),
+        return new AppProperties("Vecindad", "CodeVam", env, "http://localhost:48124",
+                new AppProperties.Mail(false, "no-reply@localhost"),
                 new AppProperties.Jwt(secret, "vecindad", Duration.ofMinutes(15), Duration.ofDays(7)),
                 new AppProperties.Security(5, Duration.ofMinutes(15), Duration.ofMinutes(30), Duration.ofHours(72), 10, 4, List.of()),
                 new AppProperties.Seed(false, "x"),
-                new AppProperties.Wompi("", "", "", "", "", ""));
+                null,
+                new AppProperties.Wompi(false, "", "", "", "", "", ""),
+                new AppProperties.Storage("/tmp/vecindad-storage"),
+                new AppProperties.Maintenance("0 30 3 * * *", 30));
     }
 
     @Test

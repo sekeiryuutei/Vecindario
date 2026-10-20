@@ -70,6 +70,19 @@ public class JdbcOnlinePaymentAdapter implements OnlinePaymentPort {
     }
 
     @Override
+    public Optional<OnlinePaymentIntent> findByReferenceForUpdate(String reference) {
+        try {
+            OnlinePaymentIntent intent = jdbc.queryForObject(
+                    "SELECT * FROM public.online_payment_intents WHERE reference = ? FOR UPDATE",
+                    MAPPER, reference
+            );
+            return Optional.ofNullable(intent);
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public void updateStatus(String reference, OnlinePaymentIntent.IntentStatus status, String wompiTxId,
                              String paymentMethod, Long feeInCents, UUID paymentId, String errorMessage) {
         jdbc.update(

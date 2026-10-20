@@ -64,8 +64,9 @@ public class JdbcBillingAdapter implements BillingPort {
     }
 
     @Override
-    public void lockUnit(UUID unitId) {
-        t.jdbc().query(t.q("SELECT id FROM {s}.property_units WHERE id = ? FOR UPDATE"), (rs, i) -> 1, unitId);
+    public boolean lockUnit(UUID unitId) {
+        return !t.jdbc().query(t.q("SELECT id FROM {s}.property_units WHERE id = ? FOR UPDATE"),
+                (rs, i) -> 1, unitId).isEmpty();
     }
 
     // ------------------------------------------------------------------ cargos

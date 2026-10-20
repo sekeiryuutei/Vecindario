@@ -33,6 +33,21 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:true}
+          starttls:
+            enable: ${SMTP_STARTTLS:true}
+            required: ${SMTP_STARTTLS:true}
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
   jackson:
     default-property-inclusion: non_null
     serialization:
@@ -54,6 +69,11 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    # El correo es una dependencia externa: una caída de SMTP no debe marcar
+    # todo el backend como no saludable ni retirarlo de rotación.
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}
 
 springdoc:
   api-docs:
@@ -70,8 +90,10 @@ app:
   name: ${APP_NAME:Vecindad}
   company: ${APP_COMPANY:CodeVam}
   env: ${APP_ENV:development}
+  public-url: ${APP_PUBLIC_URL:${APP_BASE_URL:http://localhost:48124}}
   mail:
     dev-log-links: ${MAIL_DEV_LOG_LINKS:false}
+    from: ${MAIL_FROM:${SMTP_FROM:no-reply@localhost}}
   jwt:
     secret: ${JWT_SECRET:}
     issuer: vecindad
@@ -88,13 +110,21 @@ app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}
     password: ${APP_SEED_PASSWORD:Demo#2026!}
+  bootstrap:
+    email: ${APP_BOOTSTRAP_EMAIL:}
+    password: ${APP_BOOTSTRAP_PASSWORD:}
+    name: ${APP_BOOTSTRAP_NAME:Administrador de plataforma}
   wompi:
+    enabled: ${WOMPI_ENABLED:true}
     public-key: ${WOMPI_PUBLIC_KEY:pub_test_demo}
     private-key: ${WOMPI_PRIVATE_KEY:prv_test_demo}
     events-secret: ${WOMPI_EVENTS_SECRET:test_events_secret}
     integrity-secret: ${WOMPI_INTEGRITY_SECRET:test_integrity_secret}
     api-url: ${WOMPI_API_URL:https://sandbox.wompi.co/v1}
-    redirect-url: ${WOMPI_REDIRECT_URL:http://localhost:48124/payments/wompi-result}
+    redirect-url: ${WOMPI_REDIRECT_URL:http://localhost:48124/pagos/wompi/resultado}
   storage:
     local-dir: ${STORAGE_LOCAL_DIR:/tmp/vecindad-storage}
+  maintenance:
+    token-cleanup-cron: ${TOKEN_CLEANUP_CRON:0 30 3 * * *}
+    token-retention-days: ${TOKEN_RETENTION_DAYS:30}
 

@@ -1,7 +1,9 @@
 package com.codevam.vecindad.notifications.application;
 
+import com.codevam.vecindad.config.AppProperties;
 import com.codevam.vecindad.notifications.application.port.out.NotificationPort;
 import com.codevam.vecindad.notifications.domain.*;
+import com.codevam.vecindad.shared.mail.MailGateway;
 import com.codevam.vecindad.shared.model.PageResult;
 import com.codevam.vecindad.shared.tenancy.TenantJdbc;
 import org.slf4j.Logger;
@@ -23,10 +25,14 @@ public class NotificationService {
 
     private final NotificationPort port;
     private final TenantJdbc t;
+    private final MailGateway mail;
+    private final AppProperties props;
 
-    public NotificationService(NotificationPort port, TenantJdbc t) {
+    public NotificationService(NotificationPort port, TenantJdbc t, MailGateway mail, AppProperties props) {
         this.port = port;
         this.t = t;
+        this.mail = mail;
+        this.props = props;
     }
 
     public TenantNotificationSettings getSettings() {
@@ -39,6 +45,10 @@ public class NotificationService {
         return getSettings();
     }
 
+    /**
+     * Entrega real por el canal solicitado. Un canal sin proveedor configurado
+     * queda SKIPPED (nunca SENT) para no reportar entregas que no ocurrieron.
+     */
     public NotificationLog send(NotificationChannel channel, String email, String phone, UUID userId,
                                 NotificationType type, String subject, String body) {
         TenantNotificationSettings settings = port.getSettings();
@@ -50,21 +60,51 @@ public class NotificationService {
         };
 
         if (!enabled) {
-            log.info("Canal {} deshabilitado para tenant. Notificación omitida ({})", channel, type);
             return port.log(new NotificationLog(
                     null, email, phone, userId, channel, type, subject, body,
-                    NotificationStatus.SKIPPED, "Canal deshabilitado en configuración", null
+                    NotificationStatus.SKIPPED, "Canal deshabilitado en la configuración de la copropiedad.", null
             ));
         }
 
-        // Mock/Sandbox dispatch (en producción conecta con SMTP / FCM / Meta WhatsApp API)
-        log.info("[NOTIFICACION DISPATCH] Canal: {}, Destinatario: {}, Tipo: {}, Asunto: {}",
-                channel, email != null ? email : phone, type, subject);
+        if (channel != NotificationChannel.EMAIL) {
+            return port.log(new NotificationLog(
+                    null, email, phone, userId, channel, type, subject, body,
+                    NotificationStatus.SKIPPED,
+                    "El canal " + channel.name() + " requiere un proveedor externo que no está configurado en este despliegue.", null
+            ));
+        }
 
-        return port.log(new NotificationLog(
-                null, email, phone, userId, channel, type, subject, body,
-                NotificationStatus.SENT, null, null
-        ));
+        if (email == null || email.isBlank()) {
+            return port.log(new NotificationLog(
+                    null, email, phone, userId, channel, type, subject, body,
+                    NotificationStatus.SKIPPED, "El destinatario no tiene correo electrónico registrado.", null
+            ));
+        }
+
+        if (!mail.isConfigured()) {
+            String detail = props.isProduction()
+                    ? "El transporte SMTP no está configurado; no se realizó el envío."
+                    : "SMTP no configurado en desarrollo; no se realizó el envío.";
+            log.warn("Notificación {} no enviada a {}: {}", type, email, detail);
+            return port.log(new NotificationLog(
+                    null, email, phone, userId, channel, type, subject, body,
+                    NotificationStatus.FAILED, detail, null
+            ));
+        }
+
+        try {
+            mail.send(email, subject, body, html(subject, body));
+            return port.log(new NotificationLog(
+                    null, email, phone, userId, channel, type, subject, body,
+                    NotificationStatus.SENT, null, null
+            ));
+        } catch (RuntimeException e) {
+            log.error("No se pudo enviar la notificación {} a {}: {}", type, email, e.getMessage());
+            return port.log(new NotificationLog(
+                    null, email, phone, userId, channel, type, subject, body,
+                    NotificationStatus.FAILED, "Fallo del transporte de correo: " + e.getMessage(), null
+            ));
+        }
     }
 
     public PageResult<NotificationLog> listLogs(UUID userId, int page, int size) {
@@ -103,15 +143,38 @@ public class NotificationService {
                 String body = "Estimado propietario del inmueble " + d.identifier() + ":\n\n"
                         + "Le informamos que presenta un saldo pendiente en mora por valor de "
                         + cur.format(d.totalDebt()) + ".\n\n"
-                        + "Por favor realice su pago a la brevedad posible para evitar cobro de intereses o restricciones en zonas comunes.";
-                send(NotificationChannel.EMAIL, d.email(), d.phone(), d.userId(),
+                        + "Por favor realice su pago a la brevedad posible para evitar cobro de intereses o restricciones en zonas comunes.\n\n"
+                        + props.name() + " · " + props.company();
+                NotificationLog result = send(NotificationChannel.EMAIL, d.email(), d.phone(), d.userId(),
                         NotificationType.PORTFOLIO_OVERDUE, subject, body);
-                sent++;
+                if (result.status() == NotificationStatus.SENT) {
+                    sent++;
+                }
             }
         }
         return sent;
     }
 
+    private String html(String subject, String body) {
+        String safeSubject = escape(subject);
+        String safeBody = escape(body).replace("\n", "<br>");
+        return """
+                <!doctype html><html lang="es"><body style="margin:0;background:#f4f6f4;font-family:Arial,Helvetica,sans-serif;color:#17231f">
+                <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="padding:28px 12px"><tr><td align="center">
+                <table role="presentation" width="100%%" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden">
+                <tr><td style="background:#0f5c4d;color:#fff;padding:20px 28px;font-size:19px;font-weight:bold">%s</td></tr>
+                <tr><td style="padding:28px"><h1 style="font-size:21px;margin:0 0 16px">%s</h1>
+                <p style="font-size:15px;line-height:1.65;margin:0">%s</p></td></tr>
+                <tr><td style="padding:16px 28px;background:#f7f9f7;font-size:12px;color:#6b7771">%s · %s</td></tr>
+                </table></td></tr></table></body></html>
+                """.formatted(escape(props.name()), safeSubject, safeBody, escape(props.name()), escape(props.company()));
+    }
+
+    private String escape(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;");
+    }
+
     private record DebtorRow(UUID unitId, String identifier, String email, String phone, UUID userId, BigDecimal totalDebt) {}
 }
-

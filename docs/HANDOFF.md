@@ -1,11 +1,11 @@
 # VECINDAD — Documento Maestro de Traspaso (Handoff)
-**Estado al cierre de la Fase 5 (Backend 100% Completado y Verificado)**
+**Estado al cierre de la Fase 6 (backend, frontend e infraestructura completos)**
 
 Plataforma SaaS multi-tenant empresarial de administración integral de copropiedades residenciales en Colombia.
 - **Marca:** `APP_NAME` (por defecto: **Vecindad**)
 - **Empresa proveedora:** `APP_COMPANY` (por defecto: **CodeVam**)
-- Ambos nombres son dinámicos y se configuran vía variables de entorno (`.env`), nunca hardcodeados en el código ni en la UI.
-- Powered by CodeVam (discreto en footer).
+- Ambos nombres se configuran vía variables de entorno (`.env`); la UI y el manifest PWA los consumen desde la API. Los valores por defecto de desarrollo no se usan en producción: el validador exige configurarlos.
+- El pie de página muestra `APP_COMPANY`; no hay una marca de proveedor hardcodeada en la UI.
 - **Prohibición absoluta:** Cero referencias a IA, cero placeholders, cero stubs incompletos ("coming soon", TODOs). Todo debe ser código de producción real.
 
 ---
@@ -17,7 +17,7 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 - **Arquitectura:** Hexagonal / Puertos y Adaptadores por módulo (`domain`, `application`, `port/in`, `port/out`, `adapter/in/web`, `adapter/out/persistence`).
 - **Persistencia y Aislamiento:** PostgreSQL 16 con estrategia **Schema-per-Tenant** (un esquema independiente por copropiedad: `tenant_demo_norte`, `tenant_demo_sur`, etc. y esquema global `public`).
 - **Migraciones de BD:** Flyway automatizado:
-  - Migraciones globales: `src/main/resources/db/migration/global` (hasta `V9__phase5_global.sql`).
+  - Migraciones globales: `src/main/resources/db/migration/global` (hasta `V10__operational_permissions.sql`).
   - Migraciones por tenant: `src/main/resources/db/migration/tenant` (hasta `V8__phase5_tenant.sql`).
   - `TenantMigrationRunner`: Aplica migraciones dinámicamente a todos los esquemas de copropiedad al arrancar o al aprovisionar un nuevo tenant.
 - **Seguridad y Multi-tenancy:**
@@ -33,7 +33,9 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
   - `vecindad_postgresql`: PostgreSQL 16 Alpine (puerto 48122 -> 5432).
   - `vecindad_redis`: Redis 7 Alpine (puerto 48123 -> 6379).
   - `vecindad_nginx`: Nginx 1.27 Alpine (puerto 48124 -> 80) actuando como reverse proxy hacia el backend y frontend.
-  - `vecindad_frontend` (preparado bajo perfil `frontend`): Nginx sirviendo la build de Angular/Ionic (`dist/vecindad/browser`).
+  - `vecindad_frontend`: build multi-stage de Angular/Ionic y Nginx sirviendo `dist/vecindad/browser` con cabeceras de
+    seguridad, service worker y fallback de rutas.
+  - Volumen `vecindad_storage` para documentos/certificados y healthchecks en todos los servicios.
 
 ---
 
@@ -48,8 +50,8 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 | **Fase 3b** | Conciliación bancaria: Importación asíncrona de extractos CSV/XLSX, Perfiles por entidad bancaria, Motor de matching heurístico con puntajes y umbrales, Identidad estable por hash (`tx_hash`), Revisión manual, Reversión de conciliación. | **Completada** | Tests unitarios + Smoke tests |
 | **Fase 3c** | Pasarela de pagos Wompi: Intenciones de pago, Webhook con validación criptográfica de firma SHA-256 e idempotencia, Feature flag `ONLINE_PAYMENTS`. Certificados digitales PDF (Paz y Salvo, Estado de Cuenta, Propiedad) con código QR y verificación pública hash. | **Completada** | Tests unitarios + Smoke tests |
 | **Fase 4** | Zonas comunes y reservas con validación de horarios y bloqueo automático por mora, PQRS y convivencia con SLA estricto (24h para ruido / Código de Policía Ley 1801) y notas privadas, Comunicados segmentados con acuse de lectura, Notificaciones multicanal (Email, Push, WhatsApp), Repositorio documental con permisos por rol y `StoragePort`, Asambleas generales ordinarias/extraordinarias con quórum dinámico y votación ponderada por coeficientes (Ley 675). | **Completada** | Tests unitarios + Smoke tests |
-| **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **83/83 unit tests OK, 20/20 secciones smoke test OK** |
-| **Fase 6** | **Frontend Móvil y Web:** Angular 18+ con Ionic 8, Capacitor (iOS/Android), PWA, diseño responsive multi-rol (Administrador, Portero, Contador, Consejo, Residente/Propietario). | **PENDIENTE (Siguiente Paso)** | A construir |
+| **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **101/101 unit tests OK, smoke test integral OK** |
+| **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build` y `mvn -B clean test` OK; Docker build multi-stage** |
 
 ---
 
@@ -61,7 +63,8 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
 - `POST /auth/select-tenant`: Selecciona la copropiedad activa y emite token específico para el tenant.
 - `GET /auth/me`, `POST /auth/change-password`, `POST /auth/forgot-password`, `POST /auth/reset-password`
-- `GET /public/config`: Parámetros públicos de la plataforma (Branding: `appName`, `appCompany`).
+- `GET /public/config`: Parámetros públicos de la plataforma (Branding: `appName`, `company`).
+- `GET /public/manifest.webmanifest`: Manifest PWA generado con `APP_NAME` y los iconos del frontend.
 - `GET /tenants/current`: Datos de la copropiedad activa.
 - `GET /audit`: Registro inmutable de auditoría del tenant.
 - `GET/POST /platform/companies`, `GET/POST /platform/tenants`: Gestión de nivel Super Admin.
@@ -142,8 +145,8 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 # 1. Asegurar archivo .env
 cp .env.example .env
 
-# 2. Levantar los contenedores de Docker (Postgres, Redis, Backend, Nginx)
-docker compose up -d --build vecindad_nginx
+# 2. Levantar todos los contenedores (Postgres, Redis, backend, frontend y Nginx)
+docker compose up -d --build
 
 # 3. Ver logs del backend para confirmar arranque limpio y migraciones Flyway
 docker logs vecindad_backend --tail 50
@@ -151,17 +154,21 @@ docker logs vecindad_backend --tail 50
 # 4. Ejecutar la suite completa de pruebas unitarias
 cd backend
 mvn test
-# Resultado esperado: Tests run: 83, Failures: 0, Errors: 0, Skipped: 0 -> BUILD SUCCESS
+# Resultado esperado: Tests run: 101, Failures: 0, Errors: 0, Skipped: 0 -> BUILD SUCCESS
 cd ..
 
-# 5. Ejecutar la suite de smoke tests integral (20 secciones de prueba end-to-end)
+# 5. Compilar el frontend de producción y ejecutar el smoke test integral
+cd frontend
+npm ci
+npm run build
+cd ..
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
-# Resultado esperado: Las 20 secciones en verde y mensaje final "TODO OK"
+# Resultado esperado: build sin errores, secciones del smoke test en verde y mensaje final "TODO OK"
 ```
 
 ### 4.2 Credenciales de Demostración
 - **Contraseña universal de demo:** `Demo#2026!` (configurable vía `APP_SEED_PASSWORD`).
-- **Super Administrador de Plataforma:** `superadmin@codevam.local`
+- **Super Administrador de Plataforma:** `superadmin@vecindad.local`
 - **Administrador Multi-copropiedad:** `admin@vecindad.local` (acceso a `demo_norte` y `demo_sur`).
 - **Portería Norte:** `portero@demo-norte.local`
 - **Contador Norte:** `contador@demo-norte.local`
@@ -190,18 +197,32 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 ---
 
-## 6. Siguiente Paso Obligatorio: Fase 6 (Frontend)
+## 6. Fase 6 implementada (Frontend Web, PWA y Móvil)
 
-El backend está **100% completo, probado y verificado**. La siguiente etapa es la construcción del **Frontend**:
-
-- **Ubicación:** Carpeta `./frontend`.
-- **Tecnologías:** Angular 18+ con Ionic 8 Framework, Capacitor 6+ y soporte PWA.
-- **Contrato de Build Docker:** El servicio `vecindad_frontend` en `docker-compose.yml` (bajo el perfil `frontend`) compila el proyecto y monta la carpeta `dist/vecindad/browser` en un servidor Nginx ligero.
-- **Requisitos de UI/UX:**
-  - Branding dinámico obtenido del endpoint `/api/v1/public/config`.
-  - Selector de copropiedad para usuarios con membresías múltiples.
-  - Vistas adaptadas a los distintos roles:
-    1. **Super Administrador:** Gestión de empresas y copropiedades.
-    2. **Administración:** Dashboard ejecutivo, inmuebles, cartera, proveedores, mantenimiento, asambleas y reportes.
-    3. **Portería:** Interfaz táctil y rápida para control de acceso de vehículos, visitantes (lector QR / walk-in), paquetería y novedades de seguridad.
-    4. **Portal del Residente (App Móvil / PWA):** Estado de cuenta, pagos en línea (Wompi), autorizaciones de visitas, reserva de zonas comunes, radicación de PQRS, comunicados y votación en asambleas.
+- **Ubicación:** `./frontend`, Angular 20.3 standalone + Ionic 8.8 + Capacitor 8.5 + PWA.
+- **Salida de build:** `dist/vecindad/browser`, servida por el Nginx del contenedor `vecindad_frontend` y proxied por el
+  Nginx del borde. El servicio no usa perfiles: `docker compose up -d --build` levanta frontend, backend e
+  infraestructura en un solo comando.
+- **Branding:** `BrandingService` inicializa `APP_NAME`/`APP_COMPANY` desde `GET /api/v1/public/config`; el manifest PWA
+  se sirve desde `GET /api/v1/public/manifest.webmanifest` con `APP_NAME`, y la UI nunca hardcodea la marca.
+- **Sesión y permisos:** tokens en almacenamiento local, refresh automático en 401, interceptores de error, guards de
+  autenticación/permisos y menús filtrados por los permisos reales de la copropiedad activa.
+- **Rutas principales:**
+  - Públicas: `/login`, `/recuperar`, `/restablecer`, `/seleccionar-copropiedad`, `/verificar-certificado/:code`,
+    `/pagos/wompi/resultado`.
+  - Administración: dashboard, inmuebles, personas, vehículos, cartera, pagos, conciliación, certificados, reservas,
+    PQRS, comunicados, notificaciones, documentos, asambleas, proveedores, mantenimiento, presupuesto, reportes,
+    auditoría, usuarios, roles y configuración.
+  - Portería: control de acceso, visitantes con escáner QR, paquetería y novedades.
+  - Residente: inmuebles, vehículos, estado de cuenta, pagos Wompi, certificados, visitantes, reservas, PQRS,
+    comunicados, asambleas, documentos y paquetes.
+  - Plataforma: empresas, copropiedades, auditoría global y dashboard de superadmin.
+- **PWA y móvil:** manifest dinámico con `APP_NAME`, iconos 192/512/maskable, service worker con precarga de assets y
+  navegación SPA; proyectos Android e iOS generados con Capacitor, permisos de cámara declarados, `runtime-config.json`
+  para fijar la API absoluta de la app nativa y script de sincronización que toma `APP_NAME`/`APP_PUBLIC_URL`
+  (`npm run cap:sync`, `cap:android`, `cap:ios`).
+- **Verificación:** `npm run build` finaliza sin errores ni warnings de plantillas; `npm run cap:sync` sincroniza
+  Android/iOS con la API absoluta y el nombre de la app; el backend compila y pasa `mvn -B clean test`; la imagen Docker
+  multi-stage del frontend se construye a partir de `docker/frontend/Dockerfile`.
+- **Operación:** el Nginx del frontend sirve `index.html`, `ngsw.json` y `ngsw-worker.js` sin caché, aplica CSP y
+  cabeceras de seguridad, y usa fallback a `index.html` para rutas profundas.

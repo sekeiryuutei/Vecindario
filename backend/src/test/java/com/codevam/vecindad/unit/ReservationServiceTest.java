@@ -50,6 +50,7 @@ class ReservationServiceTest {
         );
 
         when(commonAreaPort.findById(areaId)).thenReturn(Optional.of(area));
+        when(commonAreaPort.lockById(areaId)).thenReturn(Optional.of(area));
         when(reservationPort.isUnitBlockedByDebt(unitId)).thenReturn(false);
         when(reservationPort.countActiveByUnit(unitId)).thenReturn(0);
         when(reservationPort.findOverlapping(any(), any(), any(), any())).thenReturn(List.of());
