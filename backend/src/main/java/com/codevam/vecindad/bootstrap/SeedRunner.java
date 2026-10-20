@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 /** Datos de demostración (solo desarrollo). Idempotente: si ya existe demo_norte no hace nada. */
@@ -69,6 +70,11 @@ public class SeedRunner implements ApplicationRunner {
                 "901000001-1", "demo_norte", "Calle 10 # 20-30", "Cali", "Valle del Cauca", "+57 602 000 0001", "admin@demo-norte.local"));
         Tenant sur = tenantAdmin.createTenant(new TenantAdminService.NewTenant(company.id(), "Conjunto Demo Sur",
                 "901000002-2", "demo_sur", "Carrera 50 # 5-15", "Cali", "Valle del Cauca", "+57 602 000 0002", "admin@demo-sur.local"));
+        for (Tenant tenant : List.of(norte, sur)) {
+            for (String feature : List.of("WHATSAPP", "CAMERAS", "LPR", "ASSEMBLIES", "ONLINE_PAYMENTS")) {
+                tenantAdmin.setFeature(tenant.id(), feature, true);
+            }
+        }
 
         String hash = encoder.encode(props.seed().password());
         user("superadmin@vecindad.local", "Super Administrador Plataforma", hash, Roles.SUPER_ADMIN_PLATFORM);

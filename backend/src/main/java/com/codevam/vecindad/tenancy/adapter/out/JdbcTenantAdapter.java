@@ -65,6 +65,16 @@ public class JdbcTenantAdapter implements TenantPort {
     }
 
     @Override
+    public void updateDetails(UUID id, String name, String nit, String address, String city, String department,
+                              String phone, String email) {
+        jdbc.update("""
+                UPDATE public.tenants
+                   SET name = ?, nit = ?, address = ?, city = ?, department = ?, phone = ?, email = ?, updated_at = now()
+                 WHERE id = ?
+                """, name, nit, address, city, department, phone, email, id);
+    }
+
+    @Override
     public void updateStatus(UUID id, TenantStatus status) {
         jdbc.update("UPDATE public.tenants SET status = ?, updated_at = now() WHERE id = ?", status.name(), id);
     }
@@ -94,6 +104,12 @@ public class JdbcTenantAdapter implements TenantPort {
         String in = statuses.stream().map(s -> "?").collect(Collectors.joining(","));
         return jdbc.queryForList("SELECT schema_name FROM public.tenants WHERE status IN (" + in + ") ORDER BY schema_name",
                 String.class, statuses.stream().map(Enum::name).toArray());
+    }
+
+    @Override
+    public List<Tenant> findActive() {
+        return jdbc.query("SELECT " + TENANT_COLS + " FROM public.tenants WHERE status = 'ACTIVE' ORDER BY name",
+                TENANT);
     }
 
     @Override

@@ -3,9 +3,9 @@
 Plataforma SaaS multi-copropiedad para portería, cartera, convivencia y administración. Nombre y empresa visibles se
 configuran con `APP_NAME` y `APP_COMPANY`; ningún texto de la interfaz los hardcodea.
 
-> **Estado: Fases 1 a 6 completadas.** Backend Spring Boot, frontend Angular/Ionic/PWA, aplicación Capacitor para
-> Android/iOS e infraestructura Docker quedaron implementados. La suite unitaria del backend (101 pruebas) y la
-> compilación de producción del frontend se ejecutan sin errores.
+> **Estado: fases 1 a 6 completadas, más autogestión, nómina, WhatsApp y calidad automatizada.** Backend Spring Boot,
+> frontend Angular/Ionic/PWA, aplicación Capacitor para Android/iOS e infraestructura Docker implementados. La suite del
+> backend (118 unitarias + 51 de integración), la compilación del frontend y Playwright (5/5) se ejecutan sin errores.
 
 ## Contenido
 
@@ -15,9 +15,13 @@ configuran con `APP_NAME` y `APP_COMPANY`; ningún texto de la interfaz los hard
   un solo uso; paquetería y novedades de portería.
 - Cartera con cargos, facturación masiva idempotente, pagos, notas crédito/débito, intereses, estados de cuenta, libro
   inmutable y conciliación bancaria CSV/XLSX.
-- Wompi con firma de webhook, idempotencia y bloqueo pesimista; certificados PDF con verificación pública.
-- Reservas de zonas comunes, PQRS con SLA, comunicados, notificaciones por correo y registro de entregas, documentos con
-  almacenamiento persistente, asambleas con quórum y votación ponderada.
+- Wompi con firma de webhook, idempotencia y bloqueo pesimista; monto mínimo de `$1.500 COP`; certificados PDF con
+  verificación pública.
+- Reservas de zonas comunes, PQRS con SLA, comunicados, notificaciones por correo y WhatsApp, registro de entregas,
+  documentos con almacenamiento persistente, asambleas con quórum y votación ponderada.
+- Autogestión de datos de la copropiedad y canales; nómina parametrizable con aportes, provisiones, pago, anulación y CSV.
+- WhatsApp Cloud API entrante con firma e idempotencia y respuestas asistidas con proveedores intercambiables y respaldo
+  local; la interfaz no expone marcas ni proveedores.
 - Proveedores y contratos, mantenimiento, presupuesto, reportes CSV/PDF y cámaras LPR desacopladas.
 - Frontend standalone con Angular 20, Ionic 8 y Capacitor 8: portal de administración, portería, residente, superadmin
   de plataforma, páginas públicas, PWA instalable y proyecto móvil.
@@ -110,26 +114,33 @@ npm run cap:sync
 ```
 
 La PWA web sigue usando `/api/v1` en el mismo origen. En el backend, `CORS_ALLOWED_ORIGINS` debe incluir
-`https://localhost` (Android) y `capacitor://localhost` (iOS) cuando se use la app nativa. La cámara del escáner QR ya
-declara permisos en `AndroidManifest.xml` e `Info.plist`.
+`https://localhost` (Android), `capacitor://localhost` (iOS) e `ionic://localhost` cuando se use la app nativa. La cámara
+del escáner QR ya declara permisos en `AndroidManifest.xml` e `Info.plist`.
 
 ## Pruebas
 
 ```bash
 cd backend
-mvn -B clean test       # 101 pruebas unitarias, sin Docker
-mvn -B verify           # añade *IT con PostgreSQL real vía Testcontainers (requiere Docker)
+mvn -B test             # 118 pruebas unitarias, sin Docker
+mvn -B verify           # 51 IT con PostgreSQL real + JaCoCo (requiere Docker)
 ```
 
-El frontend se valida con `npm run build` (compilación estricta de plantillas y service worker). El smoke test integral
-del backend se ejecuta con el sistema levantado y seed activo:
+El frontend se valida con `npm run build` y Playwright (5 flujos de los cuatro portales). El smoke test integral del
+backend se ejecuta con el sistema levantado y seed activo:
+
+```bash
+cd frontend
+npx playwright install chromium
+E2E_BASE_URL=http://localhost:48124 E2E_PASSWORD='Demo#2026!' npm run test:e2e
+```
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-Cubre salud, autenticación multi-copropiedad, aislamiento, portería, visitantes, cartera, conciliación, Wompi,
-certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento, presupuesto y reportes.
+El smoke cubre 23 secciones: salud, autenticación multi-copropiedad, aislamiento, portería, visitantes, cartera,
+conciliación, Wompi, certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento,
+presupuesto, reportes, autogestión, nómina y WhatsApp.
 
 ## Producción
 
@@ -138,16 +149,20 @@ Antes de exponer el servicio:
 1. `APP_ENV=production`, `APP_SEED_ENABLED=false`, `SWAGGER_ENABLED=false`, `MAIL_DEV_LOG_LINKS=false`.
 2. `APP_PUBLIC_URL` y `WOMPI_REDIRECT_URL` con HTTPS público; `CORS_ALLOWED_ORIGINS` solo con orígenes HTTPS reales y,
    si se compila la app nativa, los orígenes exactos `https://localhost` y `capacitor://localhost`.
-3. Claves nuevas y robustas para PostgreSQL, Redis, JWT (48+ bytes) y Wompi de producción; SMTP real con
-   `SMTP_HOST` y `MAIL_FROM` válidos.
+3. Claves nuevas y robustas para PostgreSQL, Redis, JWT (48+ bytes), Wompi, SMTP y WhatsApp. En Wompi, el secreto de
+   integridad y el de eventos deben ser distintos; el redirect debe ser HTTPS público.
 4. TLS terminado en un proxy delante de Nginx, backups programados y restauración probada.
 5. `STORAGE_LOCAL_DIR` en un volumen persistente (el compose ya monta `vecindad_storage`).
-6. En una instalación nueva sin seed, define `APP_BOOTSTRAP_EMAIL` y `APP_BOOTSTRAP_PASSWORD` durante el primer
+6. Si se habilitan WhatsApp y respuestas del asistente, configura `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`,
+   `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID`; registra
+   `https://TU_DOMINIO/api/v1/public/whatsapp/webhook`. Revisa `AI_*`/`GEMINI_*` y deja el respaldo local como última
+   opción.
+7. En una instalación nueva sin seed, define `APP_BOOTSTRAP_EMAIL` y `APP_BOOTSTRAP_PASSWORD` durante el primer
    arranque para crear el superadministrador de plataforma. Verifica el acceso y retira esas dos variables del entorno.
 
 El backend **no arranca** en producción si detecta seed activo, Swagger público, secretos de ejemplo, CORS inseguro,
-correo sin configurar, Wompi con llaves de prueba o almacenamiento no persistente. Ver
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) y [docs/SECURITY.md](docs/SECURITY.md).
+correo sin configurar, Wompi con llaves de prueba o secretos iguales, WhatsApp incompleto o almacenamiento no persistente.
+Ver [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) y [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Respaldo y restauración
 
@@ -184,7 +199,8 @@ vecindad/
 | **El frontend no conecta con la API** | Verifica `http://localhost:<NGINX_PORT>/api/v1/public/config` y `CORS_ALLOWED_ORIGINS`. |
 | **La PWA no se actualiza** | Recarga una vez con el service worker activo; `index.html`, `ngsw.json` y `ngsw-worker.js` se sirven sin caché. |
 | **Configuración de producción inválida** | El log indica cada variable que debe corregirse; el contenedor no arranca hasta cumplirla. |
-| **Wompi no responde** | Usa llaves y secretos del entorno correcto, y revisa `WOMPI_API_URL` y `WOMPI_REDIRECT_URL`. |
+| **Wompi no responde** | Usa llaves y secretos del entorno correcto, y revisa `WOMPI_API_URL` y `WOMPI_REDIRECT_URL`. Si el checkout rechaza la firma, el secreto de integridad no corresponde al panel. |
+| **Wompi bloquea el checkout local** | Wompi rechaza redirects HTTP/localhost; deja `WOMPI_REDIRECT_URL` vacío en desarrollo y usa el recibo de la pasarela. |
 
 ## Git
 

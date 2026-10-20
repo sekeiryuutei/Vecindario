@@ -81,16 +81,16 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
               <div class="notice">No tienes saldo pendiente. Si realizas un abono, quedará como saldo a favor.</div>
               <div class="field" style="margin-top:14px">
                 <label for="amount">Valor del abono</label>
-                <input id="amount" name="amount" type="number" min="1000" step="100" class="input" [(ngModel)]="amount">
+                <input id="amount" name="amount" type="number" min="1500" step="100" class="input" [(ngModel)]="amount">
               </div>
               <div class="form-actions">
-                <button type="button" class="btn btn-primary" [disabled]="paying() || amount < 1000" (click)="payOnline()">{{ paying() ? 'Creando pago…' : 'Pagar en línea' }}</button>
+                <button type="button" class="btn btn-primary" [disabled]="paying() || amount < 1500" (click)="payOnline()">{{ paying() ? 'Creando pago…' : 'Pagar en línea' }}</button>
               </div>
             } @else {
               <div class="row" style="align-items:flex-end">
                 <div class="field" style="flex:1">
                   <label for="amount">Valor a pagar</label>
-                  <input id="amount" name="amount" type="number" min="1000" step="100" class="input" [(ngModel)]="amount">
+                  <input id="amount" name="amount" type="number" min="1500" step="100" class="input" [(ngModel)]="amount">
                   <span class="hint">Saldo pendiente: {{ data.closingBalance | money }}</span>
                 </div>
                 <button type="button" class="btn btn-secondary" (click)="amount = data.closingBalance ?? 0">Pagar todo</button>
@@ -100,7 +100,7 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
                 <input id="notes" name="notes" class="input" maxlength="300" [(ngModel)]="notes" placeholder="Referencia o comentario del pago">
               </div>
               <div class="form-actions">
-                <button type="button" class="btn btn-primary" [disabled]="paying() || amount < 1000" (click)="payOnline()">{{ paying() ? 'Creando pago…' : 'Ir a pagar' }}</button>
+                <button type="button" class="btn btn-primary" [disabled]="paying() || amount < 1500" (click)="payOnline()">{{ paying() ? 'Creando pago…' : 'Ir a pagar' }}</button>
               </div>
               <div class="notice" style="margin-top:14px">Serás dirigido a la pasarela de pagos. Al finalizar podrás consultar el resultado en este portal.</div>
             }
@@ -206,8 +206,8 @@ export class MyStatementPage {
   }
 
   async payOnline(): Promise<void> {
-    if (!this.unitId || this.amount < 1000) {
-      this.paymentError.set('El valor mínimo del pago en línea es de $1.000.');
+    if (!this.unitId || this.amount < 1500) {
+      this.paymentError.set('El valor mínimo del pago en línea es de $1.500.');
       return;
     }
     this.paying.set(true);

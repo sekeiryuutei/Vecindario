@@ -145,6 +145,7 @@ const LABELS: Record<string, string> = {
   WHATSAPP: 'WhatsApp',
   CAMERAS: 'Cámaras',
   LPR: 'Lectura de placas (LPR)',
+  ASSEMBLIES: 'Asambleas',
   ONLINE_PAYMENTS: 'Pagos en línea',
   SUSPENDED_ACCESS: 'Acceso suspendido',
 

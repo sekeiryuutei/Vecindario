@@ -17,11 +17,14 @@ public interface TenantPort {
     Optional<Company> findCompany(UUID id);
 
     Tenant insertTenant(Tenant tenant);
+    void updateDetails(UUID id, String name, String nit, String address, String city, String department,
+                       String phone, String email);
     void updateStatus(UUID id, TenantStatus status);
     Optional<Tenant> findById(UUID id);
     boolean slugExists(String slug);
     PageResult<Tenant> list(int page, int size);
     List<String> schemasWithStatus(Collection<TenantStatus> statuses);
+    List<Tenant> findActive();
 
     void insertDefaultFeatures(UUID tenantId, Map<String, Boolean> features);
     Map<String, Boolean> features(UUID tenantId);

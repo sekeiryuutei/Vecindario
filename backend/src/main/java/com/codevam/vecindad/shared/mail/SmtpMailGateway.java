@@ -18,12 +18,15 @@ public class SmtpMailGateway implements MailGateway {
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final AppProperties props;
     private final String smtpHost;
+    private final String fromName;
 
     public SmtpMailGateway(ObjectProvider<JavaMailSender> mailSenderProvider, AppProperties props,
-                           @Value("${spring.mail.host:}") String smtpHost) {
+                           @Value("${spring.mail.host:}") String smtpHost,
+                           @Value("${app.mail.from-name:}") String fromName) {
         this.mailSenderProvider = mailSenderProvider;
         this.props = props;
         this.smtpHost = smtpHost;
+        this.fromName = fromName;
     }
 
     @Override
@@ -41,7 +44,11 @@ public class SmtpMailGateway implements MailGateway {
         try {
             MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(props.mail().from());
+            if (fromName != null && !fromName.isBlank()) {
+                helper.setFrom(props.mail().from(), fromName);
+            } else {
+                helper.setFrom(props.mail().from());
+            }
             helper.setTo(to);
             helper.setSubject(subject);
             if (html != null && !html.isBlank()) {

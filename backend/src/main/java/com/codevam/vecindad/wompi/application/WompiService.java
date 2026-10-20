@@ -37,6 +37,7 @@ import java.util.UUID;
 public class WompiService {
     private static final Logger log = LoggerFactory.getLogger(WompiService.class);
     private static final String CHECKOUT_URL = "https://checkout.wompi.co/p/";
+    private static final BigDecimal MINIMUM_ONLINE_AMOUNT = new BigDecimal("1500.00");
 
     public record IntentResponse(
             String reference,
@@ -89,6 +90,10 @@ public class WompiService {
         units.findActiveById(unitId).orElseThrow(() -> ApiException.notFound("El inmueble no existe."));
 
         BigDecimal validatedAmount = Money.positive(amount, "el pago en línea");
+        if (validatedAmount.compareTo(MINIMUM_ONLINE_AMOUNT) < 0) {
+            throw ApiException.badRequest("AMOUNT_TOO_LOW",
+                    "El valor mínimo del pago en línea es de $1.500 COP.");
+        }
         long amountInCents = validatedAmount.multiply(BigDecimal.valueOf(100)).longValueExact();
 
         Tenant tenant = tenants.findById(tenantId).orElseThrow();

@@ -24,5 +24,10 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Playwright
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
+
 # Backups locales de base de datos
 backups/

@@ -5,7 +5,10 @@ import com.codevam.vecindad.notifications.application.port.out.NotificationPort;
 import com.codevam.vecindad.notifications.domain.*;
 import com.codevam.vecindad.shared.mail.MailGateway;
 import com.codevam.vecindad.shared.model.PageResult;
+import com.codevam.vecindad.shared.tenancy.TenantContext;
 import com.codevam.vecindad.shared.tenancy.TenantJdbc;
+import com.codevam.vecindad.shared.whatsapp.WhatsAppGateway;
+import com.codevam.vecindad.tenancy.application.port.out.TenantPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,12 +29,17 @@ public class NotificationService {
     private final NotificationPort port;
     private final TenantJdbc t;
     private final MailGateway mail;
+    private final WhatsAppGateway whatsapp;
+    private final TenantPort tenants;
     private final AppProperties props;
 
-    public NotificationService(NotificationPort port, TenantJdbc t, MailGateway mail, AppProperties props) {
+    public NotificationService(NotificationPort port, TenantJdbc t, MailGateway mail, WhatsAppGateway whatsapp,
+                               TenantPort tenants, AppProperties props) {
         this.port = port;
         this.t = t;
         this.mail = mail;
+        this.whatsapp = whatsapp;
+        this.tenants = tenants;
         this.props = props;
     }
 
@@ -66,12 +74,49 @@ public class NotificationService {
             ));
         }
 
-        if (channel != NotificationChannel.EMAIL) {
+        if (channel == NotificationChannel.PUSH) {
             return port.log(new NotificationLog(
                     null, email, phone, userId, channel, type, subject, body,
                     NotificationStatus.SKIPPED,
-                    "El canal " + channel.name() + " requiere un proveedor externo que no está configurado en este despliegue.", null
+                    "El canal PUSH requiere Firebase/APNs; no está configurado en este despliegue.", null
             ));
+        }
+
+        if (channel == NotificationChannel.WHATSAPP) {
+            if (phone == null || phone.isBlank()) {
+                return port.log(new NotificationLog(
+                        null, email, phone, userId, channel, type, subject, body,
+                        NotificationStatus.SKIPPED, "El destinatario no tiene teléfono registrado.", null
+                ));
+            }
+            if (!whatsapp.isConfigured()) {
+                return port.log(new NotificationLog(
+                        null, email, phone, userId, channel, type, subject, body,
+                        NotificationStatus.SKIPPED,
+                        "WhatsApp Cloud API no está configurado en este despliegue.", null
+                ));
+            }
+            UUID tenantId = TenantContext.require().id();
+            if (!tenants.features(tenantId).getOrDefault("WHATSAPP", false)) {
+                return port.log(new NotificationLog(
+                        null, email, phone, userId, channel, type, subject, body,
+                        NotificationStatus.SKIPPED,
+                        "El canal WhatsApp no está habilitado para esta copropiedad.", null
+                ));
+            }
+            try {
+                whatsapp.sendText(phone, subject + "\n\n" + body);
+                return port.log(new NotificationLog(
+                        null, email, phone, userId, channel, type, subject, body,
+                        NotificationStatus.SENT, null, null
+                ));
+            } catch (RuntimeException e) {
+                log.error("No se pudo enviar la notificación {} por WhatsApp a {}: {}", type, phone, e.getMessage());
+                return port.log(new NotificationLog(
+                        null, email, phone, userId, channel, type, subject, body,
+                        NotificationStatus.FAILED, "Fallo del transporte de WhatsApp: " + e.getMessage(), null
+                ));
+            }
         }
 
         if (email == null || email.isBlank()) {

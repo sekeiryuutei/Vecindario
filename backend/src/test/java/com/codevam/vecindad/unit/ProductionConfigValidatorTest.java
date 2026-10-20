@@ -1,7 +1,9 @@
 package com.codevam.vecindad.unit;
 
+import com.codevam.vecindad.config.AiProperties;
 import com.codevam.vecindad.config.AppProperties;
 import com.codevam.vecindad.config.ProductionConfigValidator;
+import com.codevam.vecindad.config.WhatsAppProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 
@@ -20,7 +22,8 @@ class ProductionConfigValidatorTest {
     @Test
     void acceptsACompleteProductionConfiguration() {
         MockEnvironment env = secureEnvironment();
-        ProductionConfigValidator validator = new ProductionConfigValidator(env, productionProps());
+        ProductionConfigValidator validator = new ProductionConfigValidator(env, productionProps(),
+                whatsappDisabled(), aiLocal());
 
         assertDoesNotThrow(validator::afterPropertiesSet);
     }
@@ -45,7 +48,11 @@ class ProductionConfigValidatorTest {
                         "test_integrity_secret", "https://sandbox.wompi.co/v1", "http://localhost:8080/resultado"),
                 new AppProperties.Storage("/tmp/vecindad-storage"),
                 new AppProperties.Maintenance("0 30 3 * * *", 30));
-        ProductionConfigValidator validator = new ProductionConfigValidator(env, props);
+        ProductionConfigValidator validator = new ProductionConfigValidator(env, props,
+                new WhatsAppProperties(true, "", "", "v21.0", "", "", "https://graph.facebook.com", true, false),
+                new AiProperties(true, "gemini", "", "gemini-3.7-flash",
+                        "https://generativelanguage.googleapis.com", "", "", "https://api.openai.com/v1",
+                        List.of("local"), 20));
 
         IllegalStateException error = assertThrows(IllegalStateException.class, validator::afterPropertiesSet);
         String message = error.getMessage();
@@ -64,6 +71,9 @@ class ProductionConfigValidatorTest {
         assertTrue(message.contains("MAIL_FROM"));
         assertTrue(message.contains("WOMPI_PUBLIC_KEY"));
         assertTrue(message.contains("WOMPI_API_URL"));
+        assertTrue(message.contains("WHATSAPP_VERIFY_TOKEN"));
+        assertTrue(message.contains("WHATSAPP_ACCESS_TOKEN"));
+        assertTrue(message.contains("GEMINI_API_KEY"));
         assertTrue(message.contains("STORAGE_LOCAL_DIR"));
     }
 
@@ -80,7 +90,25 @@ class ProductionConfigValidatorTest {
                 null, new AppProperties.Storage("/tmp/vecindad-storage"),
                 new AppProperties.Maintenance("0 30 3 * * *", 30));
 
-        assertDoesNotThrow(() -> new ProductionConfigValidator(new MockEnvironment(), props).afterPropertiesSet());
+        assertDoesNotThrow(() -> new ProductionConfigValidator(new MockEnvironment(), props,
+                whatsappDisabled(), aiLocal()).afterPropertiesSet());
+    }
+
+    @Test
+    void rejectsEqualWompiSecrets() {
+        AppProperties valid = productionProps();
+        AppProperties equalSecrets = new AppProperties(
+                valid.name(), valid.company(), valid.env(), valid.publicUrl(), valid.mail(), valid.jwt(),
+                valid.security(), valid.seed(), valid.bootstrap(),
+                new AppProperties.Wompi(true, "pub_prod_example", "prv_prod_example", "same-secret",
+                        "same-secret", "https://production.wompi.co/v1",
+                        "https://app.example.com/pagos/wompi/resultado"),
+                valid.storage(), valid.maintenance());
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> new ProductionConfigValidator(secureEnvironment(), equalSecrets,
+                        whatsappDisabled(), aiLocal()).afterPropertiesSet());
+        assertTrue(error.getMessage().contains("WOMPI_INTEGRITY_SECRET y WOMPI_EVENTS_SECRET"));
     }
 
     @Test
@@ -92,7 +120,19 @@ class ProductionConfigValidatorTest {
                 new AppProperties.Wompi(false, null, null, null, null, null, null),
                 valid.storage(), valid.maintenance());
 
-        assertDoesNotThrow(() -> new ProductionConfigValidator(secureEnvironment(), withoutWompi).afterPropertiesSet());
+        assertDoesNotThrow(() -> new ProductionConfigValidator(secureEnvironment(), withoutWompi,
+                whatsappDisabled(), aiLocal()).afterPropertiesSet());
+    }
+
+    private static WhatsAppProperties whatsappDisabled() {
+        return new WhatsAppProperties(false, null, null, "v21.0", null, null,
+                "https://graph.facebook.com", false, false);
+    }
+
+    private static AiProperties aiLocal() {
+        return new AiProperties(false, "local", null, "gemini-3.7-flash",
+                "https://generativelanguage.googleapis.com", null, "gpt-4o-mini",
+                "https://api.openai.com/v1", List.of("local"), 20);
     }
 
     private static MockEnvironment secureEnvironment() {

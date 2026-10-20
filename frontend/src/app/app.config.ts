@@ -23,9 +23,10 @@ export const appConfig: ApplicationConfig = {
       enabled: environment.production,
       registrationStrategy: 'registerWhenStable:30000'
     }),
-    provideAppInitializer(async () => {
-      await inject(RuntimeConfigService).init();
-      await inject(BrandingService).init();
+    provideAppInitializer(() => {
+      const runtimeConfig = inject(RuntimeConfigService);
+      const branding = inject(BrandingService);
+      return runtimeConfig.init().then(() => branding.init());
     }),
     { provide: LOCALE_ID, useValue: 'es-CO' }
   ]

@@ -19,6 +19,15 @@ function Sha256Hex([string]$value) {
   } finally { $sha.Dispose() }
 }
 
+function HmacSha256Hex([string]$value, [string]$secret) {
+  $hmac = New-Object System.Security.Cryptography.HMACSHA256
+  try {
+    $hmac.Key = [System.Text.Encoding]::UTF8.GetBytes($secret)
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($value)
+    return (([BitConverter]::ToString($hmac.ComputeHash($bytes)) -replace '-', '')).ToLowerInvariant()
+  } finally { $hmac.Dispose() }
+}
+
 function Call($method, $path, $token = $null, $body = $null, $extra = @{}) {
   $h = @{}; if ($token) { $h['Authorization'] = "Bearer $token" }
   foreach ($k in $extra.Keys) { $h[$k] = $extra[$k] }
@@ -189,6 +198,8 @@ $superToken = $superLogin.Json.accessToken
 $feat = Call PUT "/platform/tenants/$norte/features/ONLINE_PAYMENTS" $superToken @{ enabled = $true }
 Check 'feature flag ONLINE_PAYMENTS activado' ($feat.Status -eq 200 -and $feat.Json.ONLINE_PAYMENTS -eq $true)
 
+$wpLow = Call POST '/my/payments/online' $ot @{ unitId = $unit101; amount = 1000; notes = 'Monto minimo' }
+Check 'monto menor al minimo Wompi rechazado (400)' ($wpLow.Status -eq 400)
 $wpReq = Call POST '/my/payments/online' $ot @{ unitId = $unit101; amount = 25000; notes = 'Pago cuota en linea' }
 Check 'intencion Wompi creada (201)' ($wpReq.Status -eq 201 -and $wpReq.Json.reference -like 'WP-*' -and $wpReq.Json.signature.Length -eq 64)
 $wpRef = $wpReq.Json.reference
@@ -501,8 +512,8 @@ $bItems = Call GET "/budgets/$($b2026.id)/items" $admin
 Check 'rubros presupuestales consultados' ($bItems.Status -eq 200 -and @($bItems.Json).Count -ge 3)
 
 $newItem = Call POST "/budgets/$($b2026.id)/items" $admin @{
-  code = "3.1.$((Get-Random -Minimum 10 -Maximum 99))"
-  name = "Imprevistos y Fondo de Reserva $((Get-Random))"
+  code = "3.$($runId.Substring(0, 6))"
+  name = "Imprevistos y Fondo de Reserva $runId"
   type = 'EXPENSE'
   budgetedAmount = 5000000.00
 }
@@ -512,7 +523,7 @@ $itemId = $newItem.Json.id
 $newExec = Call POST "/budgets/items/$itemId/executions" $admin @{
   amount = 150000.00
   executionDate = (Get-Date).ToString("yyyy-MM-dd")
-  invoiceNumber = "FAC-IMP-$((Get-Random))"
+  invoiceNumber = "FAC-IMP-$runId"
   description = 'Atención fuga imprevista cuarto de bombas'
 }
 Check 'registrar ejecucion presupuestal (201)' ($newExec.Status -eq 201 -and $newExec.Json.id)
@@ -545,5 +556,93 @@ Check 'deteccion LPR placa registrada autorizada' ($camDetAuth.Status -eq 200 -a
 
 $camDetUnk = Call POST '/cameras/detect' $admin @{ source = 'GATE_MAIN_LPR'; plate = 'ZZZ999' }
 Check 'deteccion LPR placa desconocida visitante' ($camDetUnk.Status -eq 200 -and $camDetUnk.Json.registered -eq $false)
+
+Write-Host '21) Autogestion de la copropiedad'
+$tenant = Call GET '/tenants/current' $admin
+Check 'datos de la copropiedad consultados' ($tenant.Status -eq 200 -and $tenant.Json.name)
+$tenantPayload = @{
+  name = $tenant.Json.name
+  nit = $tenant.Json.nit
+  address = $tenant.Json.address
+  city = $tenant.Json.city
+  department = $tenant.Json.department
+  phone = $tenant.Json.phone
+  email = $tenant.Json.email
+}
+$savedTenant = Call PUT '/tenants/current' $admin $tenantPayload
+Check 'administrador actualiza datos de la copropiedad' ($savedTenant.Status -eq 200 -and $savedTenant.Json.name -eq $tenant.Json.name)
+$camerasEnabled = [bool]$tenant.Json.features.CAMERAS
+$featureSaved = Call PUT '/tenants/current/features/CAMERAS' $admin @{ enabled = $camerasEnabled }
+Check 'administrador cambia un canal autogestionable' ($featureSaved.Status -eq 200 -and $featureSaved.Json.CAMERAS -eq $camerasEnabled)
+$platformOnly = Call PUT '/tenants/current/features/ONLINE_PAYMENTS' $admin @{ enabled = $true }
+Check 'pagos en linea sigue siendo de plataforma (403)' ($platformOnly.Status -eq 403)
+$secretaryDenied = Call PUT '/tenants/current' $secr $tenantPayload
+Check 'secretaria no edita la copropiedad (403)' ($secretaryDenied.Status -eq 403)
+
+Write-Host '22) Nomina parametrizable'
+$paySettings = Call GET '/payroll/settings' $admin
+Check 'parametros de nomina consultados' ($paySettings.Status -eq 200 -and $paySettings.Json.baseDays -ge 1 -and $paySettings.Json.healthEmployeeRate -ge 0)
+$payEmployees = Call GET '/payroll/employees?size=10' $admin
+Check 'empleada demo activa' ($payEmployees.Status -eq 200 -and @($payEmployees.Json.content).Count -ge 1)
+$payPeriod = (Get-Date).ToString('yyyy-MM')
+$payRun = Call POST '/payroll/runs' $admin @{ period = $payPeriod; notes = 'Prueba de humo' }
+if ($payRun.Status -eq 409) {
+  $runs = Call GET '/payroll/runs?size=100' $admin
+  $existingRun = $runs.Json.content | Where-Object { $_.period -eq $payPeriod } | Select-Object -First 1
+  $existingStatus = if ($existingRun) { 200 } else { 404 }
+  $payRun = [pscustomobject]@{ Status = $existingStatus; Json = $existingRun }
+}
+Check 'nomina calculada o existente' (($payRun.Status -eq 200 -or $payRun.Status -eq 201) -and $payRun.Json.id)
+$payRunId = $payRun.Json.id
+$payCsv = Invoke-WebRequest -Uri "$base/payroll/runs/$payRunId/export.csv" -Headers @{ Authorization = "Bearer $admin"; Accept = 'text/csv' } -UseBasicParsing
+Check 'exportacion de nomina en CSV' ($payCsv.StatusCode -eq 200 -and $payCsv.Content -like '*Periodo;Documento;Empleado*')
+if ($payRun.Json.status -eq 'CALCULATED') {
+  $payVoid = Call POST "/payroll/runs/$payRunId/void" $admin @{ reason = 'Limpieza de prueba de humo' }
+  Check 'nomina anulada para dejar limpio el periodo' ($payVoid.Status -eq 200 -and $payVoid.Json.status -eq 'VOID')
+}
+
+Write-Host '23) WhatsApp: verificacion, firma e idempotencia'
+$waVerifyToken = $envMap['WHATSAPP_VERIFY_TOKEN']
+$waAppSecret = $envMap['WHATSAPP_APP_SECRET']
+Check 'credenciales de WhatsApp configuradas' ($waVerifyToken -and $waAppSecret)
+Check 'canal WhatsApp habilitado en la copropiedad' ($tenant.Json.features.WHATSAPP -eq $true)
+if ($waVerifyToken -and $waAppSecret) {
+  $challenge = "smoke-$runId"
+  $verifyQuery = "hub.mode=subscribe&hub.verify_token=$([uri]::EscapeDataString($waVerifyToken))&hub.challenge=$challenge"
+  $waVerify = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook?$verifyQuery" -UseBasicParsing
+  Check 'webhook GET responde el challenge' ($waVerify.StatusCode -eq 200 -and $waVerify.Content -eq $challenge)
+
+  $waMsg = @{
+    object = 'whatsapp_business_account'
+    entry = @(@{
+      id = 'smoke'
+      changes = @(@{
+        field = 'messages'
+        value = @{
+          messaging_product = 'whatsapp'
+          metadata = @{ display_phone_number = 'smoke'; phone_number_id = $envMap['WHATSAPP_PHONE_NUMBER_ID'] }
+          messages = @(@{
+            from = '573000000002'
+            id = "wamid.smoke.$runId"
+            timestamp = "$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+            type = 'text'
+            text = @{ body = 'Hola, necesito ayuda con una reserva' }
+          })
+        }
+      })
+    })
+  }
+  $waBody = $waMsg | ConvertTo-Json -Compress -Depth 12
+  $waSig = 'sha256=' + (HmacSha256Hex $waBody $waAppSecret)
+  $waResp = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = $waSig } -UseBasicParsing
+  Check 'webhook POST firmado procesado' ($waResp.StatusCode -eq 200)
+  $waDup = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = $waSig } -UseBasicParsing
+  Check 'webhook POST idempotente' ($waDup.StatusCode -eq 200)
+  try {
+    $waBad = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = 'sha256=00' } -UseBasicParsing
+    $waBadStatus = [int]$waBad.StatusCode
+  } catch { $waBadStatus = [int]$_.Exception.Response.StatusCode }
+  Check 'webhook con firma invalida rechazado (403)' ($waBadStatus -eq 403)
+}
 
 if ($fails -eq 0) { Write-Host 'TODO OK' -ForegroundColor Green } else { Write-Host "HAY $fails FALLOS" -ForegroundColor Red; exit 1 }

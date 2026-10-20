@@ -4,11 +4,14 @@
 
 ```bash
 cd backend
-mvn -B clean test   # 101 pruebas unitarias (sin Docker)
-mvn -B verify       # unitarias + *IT con PostgreSQL real vía Testcontainers (requiere Docker)
+mvn -B test         # 118 pruebas unitarias (sin Docker)
+mvn -B verify       # 51 IT con PostgreSQL real + JaCoCo (requiere Docker)
 
 cd ../frontend
+npm ci
+npx playwright install chromium
 npm run build       # compilación estricta de Angular + service worker PWA
+E2E_BASE_URL=http://localhost:48124 E2E_PASSWORD='Demo#2026!' npm run test:e2e
 ```
 
 Con el sistema levantado y seed activo:
@@ -17,8 +20,9 @@ Con el sistema levantado y seed activo:
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-El smoke test recorre salud, login multi-copropiedad, aislamiento, portería, visitantes, cartera, conciliación, Wompi,
-certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento, presupuesto y reportes.
+El smoke test recorre 23 secciones: salud, login multi-copropiedad, aislamiento, portería, visitantes, cartera,
+conciliación, Wompi, certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento,
+presupuesto, reportes, autogestión, nómina y WhatsApp.
 La app nativa se sincroniza con `APP_PUBLIC_URL` HTTPS y `APP_NAME`:
 
 ```powershell
@@ -27,7 +31,7 @@ $env:APP_NAME='Mi Copropiedad'
 npm run cap:sync
 ```
 
-## Unitarias (101)
+## Unitarias (118)
 
 - `SchemaNamesTest`, `TenantContextTest`: saneamiento de identificadores y contexto de tenant.
 - `JwtServiceTest`: firma, expiración, llave ajena, secreto corto o de desarrollo en producción.
@@ -44,6 +48,10 @@ npm run cap:sync
 - `StatementRowMapperTest`, `MatchingEngineTest`: parseo de extractos y motor de conciliación.
 - `ReservationServiceTest`, `PqrServiceTest`, `AssemblyServiceTest`, `BudgetServiceTest`, `MaintenanceServiceTest`,
   `SupplierServiceTest`, `ReportServiceTest`, `CameraServiceTest`, `CertificatePdfTest`.
+- `PayrollServiceTest`: parámetros, novedades, aportes/provisiones, generación, recalculo, pago, anulación y numeración
+  versionada al regenerar un periodo anulado.
+- `TenantAdminServiceTest`: edición de datos y límites de los canales autogestionables.
+- `WhatsAppInboundServiceTest`: firma, idempotencia, resolución de teléfono/persona/copropiedad y respuesta del asistente.
 
 ## Integración (*IT)
 
@@ -69,20 +77,30 @@ Requieren Docker. Usan un PostgreSQL 16 real compartido por `AbstractIntegration
 Las asambleas, reservas, PQRS, presupuesto, mantenimiento, proveedores, reportes y certificados cuentan con pruebas
 unitarias; sus flujos HTTP completos se validan en el smoke test.
 
-## Frontend
+## Frontend y E2E
 
 `npm run build` valida plantillas estrictas, rutas, guards, tipado de modelos, PWA y presupuesto de bundles.
 `APP_PUBLIC_URL=... APP_NAME=... npm run cap:sync` valida además la sincronización Android/iOS y escribe la API absoluta
-en `runtime-config.json`. Las pruebas end-to-end de navegador (Playwright) quedan como siguiente mejora de calidad; no
-forman parte del pipeline actual.
+en `runtime-config.json`.
+
+Playwright cubre cinco flujos con `E2E_BASE_URL` (por defecto `http://localhost:48124`) y la contraseña demo:
+administrador, residente, portería y plataforma, incluido el cambio de copropiedad. En CI se ejecuta después de levantar
+Docker; localmente requiere el stack healthy y Chromium instalado. Los reportes quedan en `frontend/playwright-report/`.
+
+`mvn -B verify` genera `backend/target/site/jacoco/` y falla si la cobertura de líneas baja de 45%. La medición actual es
+53,57% de líneas, 42,84% de ramas y 58,66% de métodos.
 
 ## Verificación de producción
 
 Se validó un arranque limpio con `SPRING_PROFILES_ACTIVE=production`, PostgreSQL y Redis nuevos, sin seed: health `UP`,
-Flyway hasta `V10`, `/v3/api-docs` con `404`, cero tenants y usuarios. `ProductionConfigValidatorTest` cubre la
-aceptación de una configuración completa y el rechazo de URL insegura, seed, Swagger, CORS local, secretos débiles,
-SMTP ausente, Wompi de pruebas y storage efímero.
+Flyway hasta `V12` global y `V9` por tenant, `/v3/api-docs` con `404`, cero tenants y usuarios.
+`ProductionConfigValidatorTest` cubre la aceptación de una configuración completa y el rechazo de URL insegura, seed,
+Swagger, CORS local, secretos débiles, secretos Wompi iguales, SMTP ausente, Wompi de pruebas, WhatsApp incompleto y
+storage efímero.
 
-También se verificó CORS real: preflight desde `https://localhost` y `capacitor://localhost` devuelve
-`Access-Control-Allow-Origin`; un origen `http://localhost:3000` se rechaza. `npm audit --omit=dev` no reporta
+El webhook de Wompi se probó con eventos firmados; el checkout de sandbox carga, pero la finalización del pago requiere el
+secreto de integridad correcto del panel de Wompi (ver `docs/HANDOFF.md`, pendientes externos).
+
+También se verificó CORS real: preflight desde `https://localhost`, `capacitor://localhost` e `ionic://localhost`
+devuelve `Access-Control-Allow-Origin`; un origen `http://localhost:3000` se rechaza. `npm audit --omit=dev` no reporta
 vulnerabilidades de runtime.

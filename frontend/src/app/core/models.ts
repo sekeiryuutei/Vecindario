@@ -1715,3 +1715,128 @@ export interface SecurityAlert {
   resolvedAt?: string;
 }
 
+
+export interface UpdateTenantRequest {
+  name: string;
+  nit?: string;
+  address?: string;
+  city?: string;
+  department?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface PayrollSettings {
+  currency?: string;
+  periodicity?: "MONTHLY" | "BIWEEKLY";
+  baseDays?: number;
+  healthEmployeeRate?: number;
+  pensionEmployeeRate?: number;
+  healthEmployerRate?: number;
+  pensionEmployerRate?: number;
+  arlRate?: number;
+  compensationRate?: number;
+  senaRate?: number;
+  icbfRate?: number;
+  severanceRate?: number;
+  vacationRate?: number;
+  severanceInterestRate?: number;
+  transportAllowance?: number;
+  minimumWage?: number;
+  updatedAt?: string;
+}
+
+export interface PayrollEmployee {
+  id?: string;
+  documentType?: string;
+  documentNumber?: string;
+  fullName?: string;
+  position?: string;
+  baseSalary?: number;
+  startDate?: string;
+  endDate?: string;
+  status?: "ACTIVE" | "INACTIVE";
+  bankName?: string;
+  bankAccount?: string;
+  costCenter?: string;
+  fixedDeductions?: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PayrollEmployeeRequest {
+  documentType: string;
+  documentNumber: string;
+  fullName: string;
+  position: string;
+  baseSalary: number;
+  startDate: string;
+  endDate?: string;
+  status: "ACTIVE" | "INACTIVE";
+  bankName?: string;
+  bankAccount?: string;
+  costCenter?: string;
+  fixedDeductions?: number;
+  notes?: string;
+}
+
+export interface PayrollItem {
+  id?: string;
+  employeeId?: string;
+  employeeName?: string;
+  documentNumber?: string;
+  position?: string;
+  baseSalary?: number;
+  workedDays?: number;
+  grossPay?: number;
+  healthDeduction?: number;
+  pensionDeduction?: number;
+  otherDeductions?: number;
+  netPay?: number;
+  healthEmployer?: number;
+  pensionEmployer?: number;
+  arl?: number;
+  compensation?: number;
+  sena?: number;
+  icbf?: number;
+  severance?: number;
+  vacation?: number;
+  severanceInterest?: number;
+  employerCost?: number;
+}
+
+export interface PayrollRun {
+  id?: string;
+  runNumber?: string;
+  period?: string;
+  status?: "DRAFT" | "CALCULATED" | "PAID" | "VOID";
+  totalGross?: number;
+  totalDeductions?: number;
+  totalNet?: number;
+  totalEmployerCost?: number;
+  notes?: string;
+  createdBy?: string;
+  createdAt?: string;
+  calculatedAt?: string;
+  paidAt?: string;
+  voidedAt?: string;
+  voidReason?: string;
+  items?: PayrollItem[];
+}
+
+export interface PageResultPayrollEmployee {
+  content?: PayrollEmployee[];
+  page?: number;
+  size?: number;
+  totalElements?: number;
+  totalPages?: number;
+}
+
+export interface PageResultPayrollRun {
+  content?: PayrollRun[];
+  page?: number;
+  size?: number;
+  totalElements?: number;
+  totalPages?: number;
+}

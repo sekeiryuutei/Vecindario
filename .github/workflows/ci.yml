@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend · pruebas y cobertura
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Maven verify
+        working-directory: backend
+        run: mvn -B verify
+      - name: Publicar reporte JaCoCo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco
+          if-no-files-found: warn
+
+  frontend:
+    name: Frontend · compilación
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Auditoría de dependencias de ejecución
+        run: npm audit --omit=dev
+
+  e2e:
+    name: E2E · Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar navegador
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Preparar entorno de pruebas
+        run: |
+          cat > .env <<'ENV'
+          APP_NAME=Vecindad
+          APP_COMPANY=CodeVam
+          APP_ENV=development
+          APP_PUBLIC_URL=http://localhost:48124
+          JWT_SECRET=ci-only-secret-ci-only-secret-ci-only-secret-ci-only-secret
+          DATABASE_NAME=vecindad
+          DATABASE_USERNAME=vecindad
+          DATABASE_PASSWORD=ci-only-postgres-password
+          REDIS_PASSWORD=ci-only-redis-password
+          CORS_ALLOWED_ORIGINS=http://localhost:48124,https://localhost,capacitor://localhost,ionic://localhost
+          SWAGGER_ENABLED=true
+          APP_SEED_ENABLED=true
+          APP_SEED_PASSWORD=Demo#2026!
+          MAIL_DEV_LOG_LINKS=true
+          MAIL_FROM=no-reply@localhost
+          SMTP_HOST=
+          WOMPI_ENABLED=false
+          WHATSAPP_ENABLED=false
+          AI_ENABLED=false
+          AI_PROVIDER=local
+          STORAGE_LOCAL_DIR=/app/storage
+          ENV
+      - name: Levantar la aplicación
+        run: docker compose up -d --build
+      - name: Esperar disponibilidad
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:48124/healthz >/dev/null \
+              && curl -fsS http://localhost:48124/actuator/health | grep -q '"status":"UP"'; then
+              echo "Aplicación disponible"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs --tail=200 vecindad_backend vecindad_frontend vecindad_nginx vecindad_postgresql
+          exit 1
+      - name: Ejecutar Playwright
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://localhost:48124
+          E2E_PASSWORD: Demo#2026!
+        run: npm run test:e2e
+      - name: Publicar artefactos E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: ignore
+      - name: Detener servicios
+        if: always()
+        run: docker compose down -v

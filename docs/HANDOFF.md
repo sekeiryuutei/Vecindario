@@ -1,12 +1,12 @@
 # VECINDAD — Documento Maestro de Traspaso (Handoff)
-**Estado al cierre de la Fase 6 (backend, frontend e infraestructura completos)**
+**Estado actual: fases 1–6, autogestión, nómina, WhatsApp y calidad automatizada**
 
 Plataforma SaaS multi-tenant empresarial de administración integral de copropiedades residenciales en Colombia.
 - **Marca:** `APP_NAME` (por defecto: **Vecindad**)
 - **Empresa proveedora:** `APP_COMPANY` (por defecto: **CodeVam**)
 - Ambos nombres se configuran vía variables de entorno (`.env`); la UI y el manifest PWA los consumen desde la API. Los valores por defecto de desarrollo no se usan en producción: el validador exige configurarlos.
 - El pie de página muestra `APP_COMPANY`; no hay una marca de proveedor hardcodeada en la UI.
-- **Prohibición absoluta:** Cero referencias a IA, cero placeholders, cero stubs incompletos ("coming soon", TODOs). Todo debe ser código de producción real.
+- **Prohibición absoluta:** Cero placeholders, cero stubs incompletos ("coming soon", TODOs) y cero marcas de proveedores tecnológicos en la UI. La asistencia conversacional es una capacidad interna del canal de WhatsApp, no un módulo visible ni una marca del producto.
 
 ---
 
@@ -17,15 +17,15 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 - **Arquitectura:** Hexagonal / Puertos y Adaptadores por módulo (`domain`, `application`, `port/in`, `port/out`, `adapter/in/web`, `adapter/out/persistence`).
 - **Persistencia y Aislamiento:** PostgreSQL 16 con estrategia **Schema-per-Tenant** (un esquema independiente por copropiedad: `tenant_demo_norte`, `tenant_demo_sur`, etc. y esquema global `public`).
 - **Migraciones de BD:** Flyway automatizado:
-  - Migraciones globales: `src/main/resources/db/migration/global` (hasta `V10__operational_permissions.sql`).
-  - Migraciones por tenant: `src/main/resources/db/migration/tenant` (hasta `V8__phase5_tenant.sql`).
+  - Migraciones globales: `src/main/resources/db/migration/global` (hasta `V12__whatsapp_inbound.sql`).
+  - Migraciones por tenant: `src/main/resources/db/migration/tenant` (hasta `V9__payroll.sql`).
   - `TenantMigrationRunner`: Aplica migraciones dinámicamente a todos los esquemas de copropiedad al arrancar o al aprovisionar un nuevo tenant.
 - **Seguridad y Multi-tenancy:**
   - Stateless JWT con firma HMAC-SHA256, rotación de refresh tokens en base de datos.
   - Validación estricta del tenant: el `tenantId` se extrae exclusivamente del JWT (`tid`) validando membresía activa en BD en cada petición (`JwtAuthenticationFilter`). Jamás se confía en parámetros enviados por el cliente.
   - Contexto de tenant en hilo (`TenantContext`) y abstracción `TenantJdbc` con comodín `{s}` para aislar consultas SQL al esquema del tenant activo.
 - **Transaccionalidad Financiera:** Bloqueo pesimista por unidad (`SELECT ... FOR UPDATE`), idempotencia vía cabecera `Idempotency-Key`, libro mayor contable inmutable mediante triggers PostgreSQL. Dinero siempre en `BigDecimal`/`NUMERIC(14,2)`.
-- **Integraciones:** Pasarela de pagos Wompi (firmas SHA-256 e idempotencia de webhooks), generación de PDF nativa con OpenPDF, adaptador de almacenamiento desacoplado (`StoragePort`), adaptador desacoplado de cámaras LPR (`CameraProvider`).
+- **Integraciones:** Pasarela Wompi (firma de integridad, webhook SHA-256 e idempotencia), correo SMTP con nombre visible configurable, WhatsApp Cloud API (webhook firmado, idempotencia por `message_id`, respuestas salientes), asistente conversacional con proveedores intercambiables y respuesta local de respaldo, PDF con OpenPDF, `StoragePort` y `CameraProvider` desacoplados.
 
 ### 1.2 Infraestructura Docker
 - `docker-compose.yml` orquestado con red interna `vecindad_net`:
@@ -50,8 +50,10 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 | **Fase 3b** | Conciliación bancaria: Importación asíncrona de extractos CSV/XLSX, Perfiles por entidad bancaria, Motor de matching heurístico con puntajes y umbrales, Identidad estable por hash (`tx_hash`), Revisión manual, Reversión de conciliación. | **Completada** | Tests unitarios + Smoke tests |
 | **Fase 3c** | Pasarela de pagos Wompi: Intenciones de pago, Webhook con validación criptográfica de firma SHA-256 e idempotencia, Feature flag `ONLINE_PAYMENTS`. Certificados digitales PDF (Paz y Salvo, Estado de Cuenta, Propiedad) con código QR y verificación pública hash. | **Completada** | Tests unitarios + Smoke tests |
 | **Fase 4** | Zonas comunes y reservas con validación de horarios y bloqueo automático por mora, PQRS y convivencia con SLA estricto (24h para ruido / Código de Policía Ley 1801) y notas privadas, Comunicados segmentados con acuse de lectura, Notificaciones multicanal (Email, Push, WhatsApp), Repositorio documental con permisos por rol y `StoragePort`, Asambleas generales ordinarias/extraordinarias con quórum dinámico y votación ponderada por coeficientes (Ley 675). | **Completada** | Tests unitarios + Smoke tests |
-| **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **101/101 unit tests OK, smoke test integral OK** |
-| **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build` y `mvn -B clean test` OK; Docker build multi-stage** |
+| **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **118 unitarias + 51 IT, smoke integral OK** |
+| **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build`, Playwright 5/5 y Docker build multi-stage OK** |
+| **Autogestión y nómina** | Edición de datos de la copropiedad y activación de canales autogestionables (`WHATSAPP`, `CAMERAS`, `LPR`, `ASSEMBLIES`); pagos en línea sigue siendo una decisión de plataforma. Nómina por copropiedad con parámetros, empleados, periodos, cálculo de aportes/provisiones, pago, anulación y exportación CSV. | **Completada** | **Pruebas unitarias, smoke y flujo API/UI verificados** |
+| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 5/5; cobertura 53,57% de líneas** |
 
 ---
 
@@ -66,6 +68,8 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `GET /public/config`: Parámetros públicos de la plataforma (Branding: `appName`, `company`).
 - `GET /public/manifest.webmanifest`: Manifest PWA generado con `APP_NAME` y los iconos del frontend.
 - `GET /tenants/current`: Datos de la copropiedad activa.
+- `PUT /tenants/current`: Edición de datos básicos por el administrador de la copropiedad.
+- `PUT /tenants/current/features/{feature}`: Activación de `WHATSAPP`, `CAMERAS`, `LPR` y `ASSEMBLIES`; `ONLINE_PAYMENTS` se administra desde plataforma.
 - `GET /audit`: Registro inmutable de auditoría del tenant.
 - `GET/POST /platform/companies`, `GET/POST /platform/tenants`: Gestión de nivel Super Admin.
 
@@ -88,21 +92,22 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `GET/POST /incidents`, `PATCH /incidents/{id}/status`, `GET /security/summary`
 
 ### Cartera, Facturación y Conciliación (Fases 3a y 3b)
-- `GET/PUT /billing/settings`, `POST /billing/generate-monthly-charges`
+- `GET/PUT /billing/settings`, `POST /billing/runs/ordinary`, `POST /billing/runs/interest`
 - `GET /billing/portfolio`: Listado general de saldos y morosidad.
 - `POST /payments`: Registro de pagos con `Idempotency-Key`.
 - `POST /payments/{id}/reverse`: Reversión justificada de pagos.
-- `GET /my/account-statement`: Estado de cuenta consolidado del residente.
-- `GET /billing/ledger`: Libro mayor de movimientos contables inmutable.
-- `POST /reconciliation/imports`: Carga asíncrona de extractos bancarios.
-- `GET /reconciliation/imports/{id}`, `GET /reconciliation/rows`
-- `POST /reconciliation/rows/{id}/apply`: Conciliación manual de filas de extracto.
+- `GET /my/statement?unitId=`: Estado de cuenta consolidado del residente.
+- `GET /billing/units/{unitId}/ledger`: Libro mayor de movimientos contables inmutable.
+- `POST /bank-reconciliation/imports`: Carga asíncrona de extractos bancarios.
+- `GET /bank-reconciliation/imports/{id}`, `GET /bank-reconciliation/rows`
+- `POST /bank-reconciliation/rows/{id}/match`, `/reject`, `/revert`: Conciliación y revisión de filas de extracto.
 
 ### Wompi y Certificados PDF (Fase 3c)
-- `POST /payments/online/checkout`: Creación de intención de pago en línea.
-- `POST /payments/online/webhook/wompi`: Webhook seguro con verificación de hash SHA-256 e idempotencia.
-- `POST /certificates/clearance`: Generación de Paz y Salvo en PDF con OpenPDF.
-- `POST /certificates/statement`: Generación de Estado de Cuenta oficial en PDF.
+- `POST /my/payments/online`: Creación de intención de pago en línea (mínimo `$1.500 COP`).
+- `GET /my/payments/online/{reference}`: Consulta del estado de una intención.
+- `POST /public/wompi/events`: Webhook seguro con verificación de hash SHA-256 e idempotencia.
+- `GET /certificates/units/{unitId}/paz-y-salvo`, `.../statement`, `.../ownership`, `.../history`: Certificados PDF administrativos.
+- `GET /my/certificates/paz-y-salvo`, `.../statement`, `.../ownership`, `.../history`: Certificados del residente.
 - `GET /public/certificates/verify/{code}`: Validación pública del certificado mediante código y hash de integridad.
 
 ### Zonas Comunes, Convivencia y Asambleas (Fase 4)
@@ -116,6 +121,14 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `POST/GET /assemblies`, `POST /assemblies/{id}/check-in`, `GET /assemblies/{id}/quorum`
 - `POST/GET /assemblies/{id}/topics`, `POST /assemblies/topics/{id}/open-vote`, `POST /assemblies/topics/{id}/close-vote`
 - `POST /my/assemblies/topics/{id}/vote` (ponderado por coeficiente de copropiedad según Ley 675).
+
+### Nómina, WhatsApp y Asistencia Conversacional
+- `GET/PUT /payroll/settings`: Parámetros laborales y porcentajes por copropiedad.
+- `GET/POST /payroll/employees`, `GET/PUT/DELETE /payroll/employees/{id}`: Empleados y vinculación laboral.
+- `GET/POST /payroll/runs`, `GET /payroll/runs/{id}`, `POST /payroll/runs/{id}/recalculate`, `POST /payroll/runs/{id}/pay`, `POST /payroll/runs/{id}/void`.
+- `GET /payroll/runs/{id}/export.csv`: Exportación de la corrida en CSV (`Accept: text/csv`).
+- `GET /public/whatsapp/webhook`: Verificación del webhook de Meta Cloud API.
+- `POST /public/whatsapp/webhook`: Mensajes entrantes con validación `X-Hub-Signature-256` e idempotencia. Las notificaciones salientes usan el mismo canal desde el módulo de notificaciones.
 
 ### Proveedores, Mantenimiento, Presupuesto y Reportes (Fase 5)
 - `GET/POST /suppliers`: Directorio de proveedores.
@@ -151,27 +164,36 @@ docker compose up -d --build
 # 3. Ver logs del backend para confirmar arranque limpio y migraciones Flyway
 docker logs vecindad_backend --tail 50
 
-# 4. Ejecutar la suite completa de pruebas unitarias
+# 4. Ejecutar pruebas unitarias, integración y cobertura
 cd backend
-mvn test
-# Resultado esperado: Tests run: 101, Failures: 0, Errors: 0, Skipped: 0 -> BUILD SUCCESS
+mvn -B verify
+# Resultado esperado: 118 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
 cd ..
 
-# 5. Compilar el frontend de producción y ejecutar el smoke test integral
+# 5. Compilar el frontend y ejecutar Playwright
 cd frontend
 npm ci
+npx playwright install chromium
 npm run build
+$env:E2E_BASE_URL='http://localhost:48124'
+$env:E2E_PASSWORD='Demo#2026!'
+npm run test:e2e
 cd ..
+
+# 6. Smoke test integral (23 secciones)
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
-# Resultado esperado: build sin errores, secciones del smoke test en verde y mensaje final "TODO OK"
+# Resultado esperado: build sin errores, Playwright 5/5 y mensaje final "TODO OK"
 ```
 
 ### 4.2 Credenciales de Demostración
 - **Contraseña universal de demo:** `Demo#2026!` (configurable vía `APP_SEED_PASSWORD`).
 - **Super Administrador de Plataforma:** `superadmin@vecindad.local`
 - **Administrador Multi-copropiedad:** `admin@vecindad.local` (acceso a `demo_norte` y `demo_sur`).
+- **Administrador Demo Sur:** `admin.sur@demo-sur.local`
+- **Secretaría Norte:** `secretaria@demo-norte.local`
 - **Portería Norte:** `portero@demo-norte.local`
 - **Contador Norte:** `contador@demo-norte.local`
+- **Consejo Norte:** `consejo@demo-norte.local`
 - **Propietario / Residente Norte:** `propietario@demo-norte.local` (asociado a apartamentos `T1-101`, `T1-102` y vehículo `ABC123`).
 
 ---
@@ -195,6 +217,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
    - El código debe mantenerse en inglés para la arquitectura/dominio (clases, variables, métodos) y en español para los textos y mensajes orientados al usuario (UI, logs amigables, mensajes de error).
    - Todos los commits de Git deben ser registrados con el autor del usuario: `Victor Burbano <vburbano@live.com>`.
 
+5. **Autogestión acotada:** el administrador de la copropiedad puede editar datos básicos y activar/desactivar únicamente `WHATSAPP`, `CAMERAS`, `LPR` y `ASSEMBLIES`. `ONLINE_PAYMENTS` sigue siendo una decisión de la plataforma para evitar que una copropiedad habilite cobros sin contrato y llaves de producción.
+
+6. **Nómina parametrizable:** los porcentajes, bases y provisiones son configurables por copropiedad. El sistema calcula y documenta, pero no certifica cumplimiento laboral ni reemplaza la revisión de un contador; la administración debe validar los parámetros y la normativa vigente.
+
+7. **WhatsApp y asistencia:** el webhook de Meta Cloud API valida `X-Hub-Signature-256`, es idempotente por `message_id` y solo responde si el canal está habilitado. Las respuestas automáticas usan adaptadores intercambiables con respaldo local; la UI no muestra proveedores ni marcas de asistencia. Los saldos solo se incluyen si `WHATSAPP_AI_INCLUDE_FINANCIAL_DATA=true`.
+
+8. **Wompi:** el monto mínimo en línea es `$1.500 COP` (mínimo de la pasarela); el redirect debe ser HTTPS público y los secretos de integridad y de eventos deben ser distintos. El webhook se firma y se procesa con idempotencia.
+
+9. **Calidad:** Playwright cubre los flujos críticos de administración, residente, portería y plataforma; JaCoCo se ejecuta en `verify` con umbral mínimo de 45% de líneas. El smoke test cubre 23 secciones, incluidas autogestión, nómina y WhatsApp.
+
 ---
 
 ## 6. Fase 6 implementada (Frontend Web, PWA y Móvil)
@@ -212,7 +244,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
     `/pagos/wompi/resultado`.
   - Administración: dashboard, inmuebles, personas, vehículos, cartera, pagos, conciliación, certificados, reservas,
     PQRS, comunicados, notificaciones, documentos, asambleas, proveedores, mantenimiento, presupuesto, reportes,
-    auditoría, usuarios, roles y configuración.
+    nómina, auditoría, usuarios, roles y configuración. La barra superior incluye “Cambiar copropiedad” cuando el
+    usuario tiene más de un tenant.
   - Portería: control de acceso, visitantes con escáner QR, paquetería y novedades.
   - Residente: inmuebles, vehículos, estado de cuenta, pagos Wompi, certificados, visitantes, reservas, PQRS,
     comunicados, asambleas, documentos y paquetes.
@@ -221,8 +254,31 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
   navegación SPA; proyectos Android e iOS generados con Capacitor, permisos de cámara declarados, `runtime-config.json`
   para fijar la API absoluta de la app nativa y script de sincronización que toma `APP_NAME`/`APP_PUBLIC_URL`
   (`npm run cap:sync`, `cap:android`, `cap:ios`).
-- **Verificación:** `npm run build` finaliza sin errores ni warnings de plantillas; `npm run cap:sync` sincroniza
-  Android/iOS con la API absoluta y el nombre de la app; el backend compila y pasa `mvn -B clean test`; la imagen Docker
-  multi-stage del frontend se construye a partir de `docker/frontend/Dockerfile`.
+- **Verificación:** `npm run build` finaliza sin errores ni warnings de plantillas; Playwright supera 5/5; `npm run cap:sync`
+  sincroniza Android/iOS con la API absoluta y el nombre de la app; el backend pasa 118 unitarias y 51 IT; la imagen
+  Docker multi-stage del frontend se construye a partir de `docker/frontend/Dockerfile`.
 - **Operación:** el Nginx del frontend sirve `index.html`, `ngsw.json` y `ngsw-worker.js` sin caché, aplica CSP y
   cabeceras de seguridad, y usa fallback a `index.html` para rutas profundas.
+
+---
+
+## 7. Estado de entrega y pendientes externos
+
+**Verificado en el entorno local:** arranque Docker, migraciones, 118 unitarias, 51 IT, cobertura 53,57% de líneas,
+Playwright 5/5, smoke de 23 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
+webhook de WhatsApp firmado/idempotente y configuración productiva fail-closed.
+
+**Pendiente para producción (requiere decisiones o credenciales del propietario):**
+
+- Dominio público, DNS y TLS; `APP_PUBLIC_URL`, `WOMPI_REDIRECT_URL` y `CORS_ALLOWED_ORIGINS` definitivos.
+- Secretos productivos: JWT, PostgreSQL, Redis, SMTP, Wompi y WhatsApp. El `WOMPI_INTEGRITY_SECRET` debe ser el secreto
+  de integridad del panel, **distinto** del secreto de eventos. En la configuración local actual ambos valores coinciden:
+  el checkout de sandbox carga, pero al pagar Wompi responde “La firma es inválida”. Sin ese secreto no se puede
+  completar un pago real de prueba; el webhook y la lógica de negocio sí están verificados con eventos firmados.
+- Wompi de producción con llaves y secretos productivos; el checkout de desarrollo debe dejar `WOMPI_REDIRECT_URL` vacío
+  porque Wompi rechaza redirects HTTP/localhost. En producción el redirect es HTTPS obligatorio.
+- WhatsApp: número de negocio real, token rotado, app de Meta dedicada, plantillas aprobadas y webhook público. El token
+  actual parece pertenecer a otra app; no debe reutilizarse en producción.
+- Almacenamiento S3 compatible (aún solo existe `LocalStorageAdapter`), firma/publicación Android/iOS, notificaciones
+  push FCM/APNs y el modelo de cobro por pago (la comisión de Wompi hace inviable una tarifa de 2–5 COP).
+- Respaldos programados, restauración probada y monitoreo/alertas del host y los contenedores.

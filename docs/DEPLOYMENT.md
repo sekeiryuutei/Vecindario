@@ -54,19 +54,51 @@ El volumen `vecindad_storage` conserva documentos y certificados. Los volúmenes
    WOMPI_ENABLED=true
    WOMPI_PUBLIC_KEY=pub_prod_...
    WOMPI_PRIVATE_KEY=prv_prod_...
-   WOMPI_EVENTS_SECRET=...
-   WOMPI_INTEGRITY_SECRET=...
+   WOMPI_EVENTS_SECRET=<secreto de eventos del panel>
+   WOMPI_INTEGRITY_SECRET=<secreto de integridad del panel, distinto al de eventos>
    WOMPI_API_URL=https://production.wompi.co/v1
    WOMPI_REDIRECT_URL=https://app.ejemplo.com/pagos/wompi/resultado
    ```
 
    Registra en Wompi el webhook `https://app.ejemplo.com/api/v1/public/wompi/events`. La firma es obligatoria; si el
-   secreto falta o no coincide, el evento se rechaza y no se registra el pago.
+   secreto falta o no coincide, el evento se rechaza y no se registra el pago. El monto mínimo de la pasarela es
+   `$1.500 COP`; la aplicación también lo valida. El redirect debe ser HTTPS público: los redirects HTTP/localhost son
+   rechazados por Wompi. Para pruebas locales se puede dejar `WOMPI_REDIRECT_URL` vacío y usar el recibo de la pasarela.
+
+4. Si se habilitan WhatsApp y respuestas automáticas, configura el webhook público y los proveedores:
+
+   ```dotenv
+   WHATSAPP_ENABLED=true
+   WHATSAPP_VERIFY_TOKEN=<token aleatorio del webhook>
+   WHATSAPP_APP_SECRET=<secreto de la app de Meta>
+   WHATSAPP_API_VERSION=v21.0
+   WHATSAPP_ACCESS_TOKEN=<token permanente>
+   WHATSAPP_PHONE_NUMBER_ID=<id del número de negocio>
+   WHATSAPP_BASE_URL=https://graph.facebook.com
+   WHATSAPP_AI_REPLIES_ENABLED=true
+   WHATSAPP_AI_INCLUDE_FINANCIAL_DATA=false
+   AI_ENABLED=true
+   AI_PROVIDER=gemini
+   GEMINI_API_KEY=<clave del proveedor>
+   GEMINI_MODEL=gemini-3.7-flash
+   GEMINI_BASE_URL=https://generativelanguage.googleapis.com
+   OPENAI_API_KEY=
+   OPENAI_MODEL=gpt-4o-mini
+   OPENAI_BASE_URL=https://api.openai.com/v1
+   AI_FALLBACK_PROVIDERS=local
+   AI_TIMEOUT_SECONDS=20
+   ```
+
+   En Meta configura la URL `https://app.ejemplo.com/api/v1/public/whatsapp/webhook`, el mismo verify token y la
+   suscripción al campo `messages`. El backend valida `X-Hub-Signature-256` y guarda cada `message_id` una sola vez. Si
+   no hay proveedor disponible, el respaldo local responde con un mensaje seguro; no incluye saldos salvo que
+   `WHATSAPP_AI_INCLUDE_FINANCIAL_DATA=true`. La UI nunca muestra el proveedor ni una marca de asistencia.
 
 El backend valida al arrancar y **aborta** si encuentra seed activo, Swagger público, CORS con `*`/HTTP o localhost de
 desarrollo, contraseñas de ejemplo, JWT corto o de desarrollo, SMTP sin configurar, Wompi con llaves de prueba o
-almacenamiento no persistente. Los orígenes nativos exactos `https://localhost` (Android) y `capacitor://localhost`
-(iOS) sí se permiten cuando se compila la app.
+secretos de integridad/eventos iguales, WhatsApp habilitado sin verify token/app secret/token/número, proveedor de
+asistencia sin su clave o almacenamiento no persistente. Los orígenes nativos exactos `https://localhost` (Android),
+`capacitor://localhost` (iOS) e `ionic://localhost` se permiten cuando se compila la app.
 
 ## Despliegue
 
@@ -165,3 +197,9 @@ Con seed deshabilitado no hay usuarios demo. El primer arranque crea el usuario 
 `APP_BOOTSTRAP_EMAIL`/`APP_BOOTSTRAP_PASSWORD`; el proceso es idempotente y no modifica una cuenta existente. Después de
 verificar el acceso, elimina ambas variables del `.env` y reinicia el backend. Con ese usuario crea la empresa y la
 primera copropiedad desde el portal de plataforma.
+
+## Alcance no automatizado
+
+La recepción de correo se verifica en el buzón del destinatario; el envío sale por SMTP. La compilación y firma de APK/IPA,
+la publicación en tiendas, las notificaciones push FCM/APNs y el almacenamiento S3 quedan fuera de este compose hasta que
+se elijan cuentas, credenciales y proveedor. El detalle y los bloqueos se mantienen en `docs/HANDOFF.md`.

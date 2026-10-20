@@ -1,0 +1,38 @@
+name: Publicar imágenes
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Construir y publicar en GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imágenes reproducibles
+        run: |
+          docker build -t vecindad/backend:local ./backend
+          docker build -f docker/frontend/Dockerfile -t vecindad/frontend:local ./frontend
+      - name: Iniciar sesión en GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Etiquetar y publicar
+        env:
+          PREFIX: ghcr.io/${{ github.repository }}
+        run: |
+          PREFIX="$(echo "${PREFIX}" | tr '[:upper:]' '[:lower:]')"
+          REF="${{ github.sha }}"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then REF="${GITHUB_REF_NAME}"; fi
+          for image in backend frontend; do
+            docker tag "vecindad/${image}:local" "${PREFIX}/${image}:${REF}"
+            docker tag "vecindad/${image}:local" "${PREFIX}/${image}:latest"
+            docker push "${PREFIX}/${image}:${REF}"
+            docker push "${PREFIX}/${image}:latest"
+          done

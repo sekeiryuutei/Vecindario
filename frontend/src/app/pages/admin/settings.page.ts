@@ -5,7 +5,12 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { label } from '../../core/labels';
-import { TenantNotificationSettings, TenantView, UpdateSettingsRequest } from '../../core/models';
+import {
+  TenantNotificationSettings,
+  TenantView,
+  UpdateSettingsRequest,
+  UpdateTenantRequest
+} from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { describeError } from '../../core/utils';
 import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.components';
@@ -20,13 +25,53 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
     </app-page-header>
 
     @if (loading()) {
-      <div class="loading"><span class="spinner"></span> Cargando configuración…</div>
+      <div class="loading"><span class="spinner"></span> Cargando configuración...</div>
     } @else {
       <div class="grid grid-2">
         <div class="card">
-          <div class="card-header"><div><h2>Datos de la copropiedad</h2><p>Información estructural registrada en la plataforma.</p></div><span class="badge" [class]="tenant()?.status === 'ACTIVE' ? 'badge success' : 'badge neutral'">{{ label(tenant()?.status) }}</span></div>
-          @if (tenant(); as current) {
-            <div class="card-body">
+          <div class="card-header">
+            <div><h2>Datos de la copropiedad</h2><p>Información visible para residentes, portería y estados de cuenta.</p></div>
+            <span class="badge" [class]="tenant()?.status === 'ACTIVE' ? 'badge success' : 'badge neutral'">{{ label(tenant()?.status) }}</span>
+          </div>
+          <div class="card-body">
+            @if (tenantError()) { <div class="alert alert-error" style="margin-bottom:14px">{{ tenantError() }}</div> }
+            @if (canManageTenant()) {
+              <div class="form-grid">
+                <div class="field span-2">
+                  <label for="tenantName">Nombre *</label>
+                  <input id="tenantName" name="tenantName" class="input" maxlength="200" [(ngModel)]="tenantForm.name">
+                </div>
+                <div class="field">
+                  <label for="tenantNit">NIT</label>
+                  <input id="tenantNit" name="tenantNit" class="input" maxlength="30" [(ngModel)]="tenantForm.nit">
+                </div>
+                <div class="field">
+                  <label for="tenantPhone">Teléfono</label>
+                  <input id="tenantPhone" name="tenantPhone" class="input" maxlength="40" [(ngModel)]="tenantForm.phone">
+                </div>
+                <div class="field span-2">
+                  <label for="tenantAddress">Dirección</label>
+                  <input id="tenantAddress" name="tenantAddress" class="input" maxlength="250" [(ngModel)]="tenantForm.address">
+                </div>
+                <div class="field">
+                  <label for="tenantCity">Ciudad</label>
+                  <input id="tenantCity" name="tenantCity" class="input" maxlength="100" [(ngModel)]="tenantForm.city">
+                </div>
+                <div class="field">
+                  <label for="tenantDepartment">Departamento</label>
+                  <input id="tenantDepartment" name="tenantDepartment" class="input" maxlength="100" [(ngModel)]="tenantForm.department">
+                </div>
+                <div class="field span-2">
+                  <label for="tenantEmail">Correo de la copropiedad</label>
+                  <input id="tenantEmail" name="tenantEmail" type="email" class="input" maxlength="254" [(ngModel)]="tenantForm.email">
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary" [disabled]="savingTenant()" (click)="saveTenant()">
+                  {{ savingTenant() ? 'Guardando...' : 'Guardar datos' }}
+                </button>
+              </div>
+            } @else if (tenant(); as current) {
               <dl class="detail-list">
                 <dt>Nombre</dt><dd>{{ current.name }}</dd>
                 <dt>NIT</dt><dd>{{ current.nit || '—' }}</dd>
@@ -39,26 +84,36 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
                 <dt>Zona horaria</dt><dd>{{ current.timezone || 'America/Bogota' }}</dd>
                 <dt>Idioma</dt><dd>{{ current.locale || 'es-CO' }}</dd>
               </dl>
-              <div class="notice" style="margin-top:16px">Los datos estructurales y el estado de la copropiedad son administrados desde la plataforma. Los cambios de roles y permisos se realizan en <strong>Roles y permisos</strong>.</div>
-            </div>
-          }
+            }
+          </div>
         </div>
 
         <div class="card">
           <div class="card-header"><div><h2>Funcionalidades activas</h2><p>Módulos habilitados para esta copropiedad.</p></div></div>
           <div class="card-body">
             @if (features().length) {
-              <div class="grid grid-2" style="gap:9px">
+              <div class="grid" style="gap:9px">
                 @for (feature of features(); track feature.key) {
                   <div class="feature-row" [class.enabled]="feature.enabled">
                     <span>
                       <strong>{{ label(feature.key) }}</strong>
                       <small>{{ feature.enabled ? 'Habilitada' : 'Deshabilitada' }}</small>
                     </span>
-                    <span class="badge" [class]="feature.enabled ? 'badge success' : 'badge neutral'">{{ feature.enabled ? 'Activa' : 'Inactiva' }}</span>
+                    @if (canManageTenant() && isSelfService(feature.key)) {
+                      <label class="check" style="margin:0">
+                        <input type="checkbox" [checked]="feature.enabled" [disabled]="savingFeature() === feature.key"
+                               (change)="toggleFeature(feature.key, $any($event.target).checked)">
+                        <span>{{ feature.enabled ? 'Activa' : 'Inactiva' }}</span>
+                      </label>
+                    } @else {
+                      <span class="badge" [class]="feature.enabled ? 'badge success' : 'badge neutral'">{{ feature.enabled ? 'Activa' : 'Inactiva' }}</span>
+                    }
                   </div>
                 }
               </div>
+              @if (canManageTenant()) {
+                <div class="notice" style="margin-top:14px">Puedes activar WhatsApp, cámaras, LPR y asambleas. Los pagos en línea y el estado de la copropiedad los administra la plataforma.</div>
+              }
             } @else {
               <app-empty-state symbol="⚙" title="Sin funcionalidades" message="No hay funcionalidades adicionales configuradas para esta copropiedad." />
             }
@@ -72,7 +127,7 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
           <div class="card-body">
             @if (settingsError()) { <div class="alert alert-error" style="margin-bottom:14px">{{ settingsError() }}</div> }
             @if (loadingSettings()) {
-              <div class="loading"><span class="spinner"></span> Cargando canales…</div>
+              <div class="loading"><span class="spinner"></span> Cargando canales...</div>
             } @else {
               <div class="form-grid">
                 <div class="field span-2"><label for="senderName">Nombre del remitente *</label><input id="senderName" name="senderName" class="input" maxlength="100" [(ngModel)]="notificationForm.senderDisplayName"><span class="hint">Nombre visible en los correos enviados a la comunidad.</span></div>
@@ -94,6 +149,9 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
           <div class="grid grid-3">
             @if (auth.hasPermission('FINANCE_VIEW')) {
               <a class="btn btn-secondary" style="justify-content:flex-start;min-height:52px" routerLink="/app/cartera">Reglas de cartera y cobro</a>
+            }
+            @if (auth.hasPermission('PAYROLL_VIEW')) {
+              <a class="btn btn-secondary" style="justify-content:flex-start;min-height:52px" routerLink="/app/nomina">Nómina y empleados</a>
             }
             @if (auth.hasPermission('ROLES_MANAGE')) {
               <a class="btn btn-secondary" style="justify-content:flex-start;min-height:52px" routerLink="/app/roles">Roles y permisos</a>
@@ -131,8 +189,12 @@ export class SettingsPage {
   readonly loading = signal(true);
   readonly loadingSettings = signal(false);
   readonly savingSettings = signal(false);
+  readonly savingTenant = signal(false);
+  readonly savingFeature = signal('');
+  readonly tenantError = signal('');
   readonly settingsError = signal('');
   readonly features = signal<Array<{ key: string; enabled: boolean }>>([]);
+  tenantForm: UpdateTenantRequest = { name: '' };
   notificationForm: UpdateSettingsRequest = {
     emailEnabled: false,
     pushEnabled: false,
@@ -140,21 +202,66 @@ export class SettingsPage {
     senderDisplayName: ''
   };
 
+  private readonly selfServiceFeatures = new Set(['WHATSAPP', 'CAMERAS', 'LPR', 'ASSEMBLIES']);
+
   constructor() {
     void this.load();
+  }
+
+  canManageTenant(): boolean {
+    return this.auth.hasPermission('TENANT_SETTINGS_MANAGE');
+  }
+
+  isSelfService(key: string): boolean {
+    return this.selfServiceFeatures.has(key);
   }
 
   async load(): Promise<void> {
     this.loading.set(true);
     try {
       const tenant = await firstValueFrom(this.api.get<TenantView>('/tenants/current'));
-      this.tenant.set(tenant);
-      this.features.set(Object.entries(tenant.features ?? {}).map(([key, enabled]) => ({ key, enabled })));
+      this.applyTenant(tenant);
       if (this.auth.hasPermission('NOTIFICATIONS_MANAGE')) await this.loadNotifications();
     } catch (error) {
       this.toast.error(describeError(error));
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async saveTenant(): Promise<void> {
+    this.tenantError.set('');
+    if (!this.tenantForm.name.trim()) {
+      this.tenantError.set('El nombre de la copropiedad es obligatorio.');
+      return;
+    }
+    this.savingTenant.set(true);
+    try {
+      const updated = await firstValueFrom(this.api.put<TenantView>('/tenants/current', {
+        ...this.tenantForm,
+        name: this.tenantForm.name.trim()
+      }));
+      this.applyTenant(updated);
+      this.toast.success('Datos de la copropiedad guardados.');
+    } catch (error) {
+      this.tenantError.set(describeError(error));
+    } finally {
+      this.savingTenant.set(false);
+    }
+  }
+
+  async toggleFeature(key: string, enabled: boolean): Promise<void> {
+    this.savingFeature.set(key);
+    try {
+      const features = await firstValueFrom(this.api.put<Record<string, boolean>>(
+        `/tenants/current/features/${key.toLowerCase()}`, { enabled }));
+      this.features.set(Object.entries(features ?? {}).map(([feature, active]) => ({ key: feature, enabled: active })));
+      this.toast.success(`${label(key)} ${enabled ? 'activada' : 'desactivada'}.`);
+    } catch (error) {
+      this.toast.error(describeError(error));
+      await this.load();
+    } finally {
+      this.savingFeature.set('');
     }
   }
 
@@ -194,5 +301,19 @@ export class SettingsPage {
     } finally {
       this.savingSettings.set(false);
     }
+  }
+
+  private applyTenant(tenant: TenantView): void {
+    this.tenant.set(tenant);
+    this.tenantForm = {
+      name: tenant.name ?? '',
+      nit: tenant.nit,
+      address: tenant.address,
+      city: tenant.city,
+      department: tenant.department,
+      phone: tenant.phone,
+      email: tenant.email
+    };
+    this.features.set(Object.entries(tenant.features ?? {}).map(([key, enabled]) => ({ key, enabled })));
   }
 }

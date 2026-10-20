@@ -73,6 +73,11 @@ interface MenuSection {
             {{ roleName() }}
             @if (branding.company()) { <span> · {{ branding.company() }}</span> }
           </div>
+          @if (auth.tenants().length > 1) {
+            <a class="topbar-switch" routerLink="/seleccionar-copropiedad" title="Cambiar de copropiedad">
+              Cambiar copropiedad
+            </a>
+          }
         </header>
         <main class="content">
           <router-outlet></router-outlet>
@@ -177,6 +182,7 @@ export class ShellComponent {
       { label: 'Pagos', path: '/app/pagos', icon: 'cardOutline', permissions: ['FINANCE_VIEW', 'PAYMENTS_CREATE', 'PAYMENTS_RECONCILE'] },
       { label: 'Conciliación bancaria', path: '/app/conciliacion', icon: 'swapHorizontalOutline', permissions: ['PAYMENTS_RECONCILE'] },
       { label: 'Presupuesto', path: '/app/presupuesto', icon: 'pieChartOutline', permissions: ['BUDGET_VIEW'] },
+      { label: 'Nómina', path: '/app/nomina', icon: 'cashOutline', permissions: ['PAYROLL_VIEW', 'PAYROLL_MANAGE'] },
       { label: 'Reportes', path: '/app/reportes', icon: 'barChartOutline', permissions: ['REPORTS_VIEW'] },
       { label: 'Certificados', path: '/app/certificados', icon: 'ribbonOutline', permissions: ['CERTIFICATES_MANAGE'] }
     ], this.auth);

@@ -22,10 +22,15 @@ public class ProductionConfigValidator implements InitializingBean {
 
     private final Environment env;
     private final AppProperties props;
+    private final WhatsAppProperties whatsapp;
+    private final AiProperties ai;
 
-    public ProductionConfigValidator(Environment env, AppProperties props) {
+    public ProductionConfigValidator(Environment env, AppProperties props, WhatsAppProperties whatsapp,
+                                     AiProperties ai) {
         this.env = env;
         this.props = props;
+        this.whatsapp = whatsapp;
+        this.ai = ai;
     }
 
     @Override
@@ -83,6 +88,25 @@ public class ProductionConfigValidator implements InitializingBean {
         require(errors, StringUtils.hasText(smtpHost), "SMTP_HOST es obligatorio para enviar invitaciones y recuperación de contraseña.");
         require(errors, StringUtils.hasText(mailFrom) && mailFrom.contains("@"), "MAIL_FROM debe ser una dirección de correo válida.");
 
+        if (whatsapp != null && whatsapp.enabled()) {
+            require(errors, StringUtils.hasText(whatsapp.verifyToken()),
+                    "WHATSAPP_VERIFY_TOKEN es obligatorio cuando WhatsApp está habilitado.");
+            require(errors, StringUtils.hasText(whatsapp.appSecret()),
+                    "WHATSAPP_APP_SECRET es obligatorio para validar la firma del webhook.");
+            require(errors, whatsapp.isConfigured(),
+                    "WHATSAPP_ACCESS_TOKEN y WHATSAPP_PHONE_NUMBER_ID son obligatorios cuando WhatsApp está habilitado.");
+            require(errors, whatsapp.baseUrl() != null && whatsapp.baseUrl().startsWith("https://"),
+                    "WHATSAPP_BASE_URL debe usar HTTPS en producción.");
+        }
+        if (ai != null && ai.enabled() && "gemini".equalsIgnoreCase(ai.provider())
+                && !StringUtils.hasText(ai.geminiApiKey())) {
+            errors.add("GEMINI_API_KEY es obligatoria cuando AI_PROVIDER=gemini.");
+        }
+        if (ai != null && ai.enabled() && "openai".equalsIgnoreCase(ai.provider())
+                && !StringUtils.hasText(ai.openaiApiKey())) {
+            errors.add("OPENAI_API_KEY es obligatoria cuando AI_PROVIDER=openai.");
+        }
+
         if (props.wompi() != null && props.wompi().enabled()) {
             require(errors, StringUtils.hasText(props.wompi().publicKey())
                             && !props.wompi().publicKey().contains("_test_")
@@ -98,6 +122,10 @@ public class ProductionConfigValidator implements InitializingBean {
             require(errors, StringUtils.hasText(props.wompi().integritySecret())
                             && !props.wompi().integritySecret().toLowerCase(Locale.ROOT).contains("test"),
                     "WOMPI_INTEGRITY_SECRET debe ser el secreto de producción.");
+            require(errors, !StringUtils.hasText(props.wompi().eventsSecret())
+                            || !StringUtils.hasText(props.wompi().integritySecret())
+                            || !props.wompi().eventsSecret().equals(props.wompi().integritySecret()),
+                    "WOMPI_INTEGRITY_SECRET y WOMPI_EVENTS_SECRET deben ser secretos distintos.");
             require(errors, props.wompi().apiUrl() != null && props.wompi().apiUrl().startsWith("https://")
                             && !props.wompi().apiUrl().contains("sandbox"),
                     "WOMPI_API_URL debe apuntar al endpoint HTTPS de producción.");

@@ -17,7 +17,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -30,6 +32,12 @@ public class TenantAdminService {
 
     public record NewTenant(UUID companyId, String name, String nit, String slug, String address, String city,
                             String department, String phone, String email) {}
+
+    public record UpdateTenantCommand(String name, String nit, String address, String city, String department,
+                                      String phone, String email) {}
+
+    private static final Set<String> SELF_SERVICE_FEATURES =
+            Set.of("WHATSAPP", "CAMERAS", "LPR", "ASSEMBLIES");
 
     private final TenantPort tenants;
     private final TenantSchemaPort schemas;
@@ -88,6 +96,38 @@ public class TenantAdminService {
         return tenants.findById(id).orElseThrow(() -> ApiException.notFound("La copropiedad no existe."));
     }
 
+    public Tenant updateDetails(UUID id, UpdateTenantCommand cmd) {
+        Tenant current = getTenant(id);
+        if (current.status() == TenantStatus.PROVISIONING || current.status() == TenantStatus.FAILED) {
+            throw ApiException.conflict("TENANT_NOT_READY", "La copropiedad no terminó de aprovisionarse.");
+        }
+        String name = cmd.name() == null ? "" : cmd.name().trim();
+        if (name.isBlank()) {
+            throw ApiException.badRequest("TENANT_NAME_REQUIRED", "El nombre de la copropiedad es obligatorio.");
+        }
+        String email = blankToNull(cmd.email());
+        if (email != null && !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw ApiException.badRequest("INVALID_TENANT_EMAIL", "El correo de la copropiedad no es válido.");
+        }
+        tenants.updateDetails(id, name, blankToNull(cmd.nit()), blankToNull(cmd.address()),
+                blankToNull(cmd.city()), blankToNull(cmd.department()), blankToNull(cmd.phone()), email);
+        audit.log(id, "TENANT_SETTINGS_UPDATED", "TENANT", id.toString(), true, Map.of("name", name));
+        return getTenant(id);
+    }
+
+    public Map<String, Boolean> setSelfServiceFeature(UUID id, String feature, boolean enabled) {
+        String key = feature == null ? "" : feature.trim().toUpperCase(Locale.ROOT);
+        if (!SELF_SERVICE_FEATURES.contains(key)) {
+            throw ApiException.forbidden("TENANT_FEATURE_NOT_SELF_SERVICE",
+                    "La funcionalidad " + key + " solo puede ser administrada por la plataforma.");
+        }
+        getTenant(id);
+        tenants.setFeature(id, key, enabled);
+        audit.log(id, "TENANT_FEATURE_UPDATED", "TENANT_FEATURE", id + ":" + key, true,
+                Map.of("feature", key, "enabled", String.valueOf(enabled)));
+        return tenants.features(id);
+    }
+
     public Tenant setStatus(UUID id, TenantStatus status) {
         if (status != TenantStatus.ACTIVE && status != TenantStatus.SUSPENDED) {
             throw ApiException.badRequest("INVALID_STATUS", "Solo se puede activar o suspender una copropiedad.");
@@ -111,6 +151,12 @@ public class TenantAdminService {
         tenants.setFeature(tenantId, feature.trim().toUpperCase(), enabled);
         audit.log(tenantId, "TENANT_FEATURE_UPDATED", "TENANT_FEATURE", tenantId + ":" + feature, true,
                 Map.of("feature", feature, "enabled", String.valueOf(enabled)));
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private static Map<String, Boolean> defaultFeatures() {

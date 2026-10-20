@@ -94,6 +94,7 @@ app:
   mail:
     dev-log-links: ${MAIL_DEV_LOG_LINKS:false}
     from: ${MAIL_FROM:${SMTP_FROM:no-reply@localhost}}
+    from-name: ${MAIL_FROM_NAME:}
   jwt:
     secret: ${JWT_SECRET:}
     issuer: vecindad
@@ -121,10 +122,31 @@ app:
     events-secret: ${WOMPI_EVENTS_SECRET:test_events_secret}
     integrity-secret: ${WOMPI_INTEGRITY_SECRET:test_integrity_secret}
     api-url: ${WOMPI_API_URL:https://sandbox.wompi.co/v1}
-    redirect-url: ${WOMPI_REDIRECT_URL:http://localhost:48124/pagos/wompi/resultado}
+    redirect-url: ${WOMPI_REDIRECT_URL:}
   storage:
     local-dir: ${STORAGE_LOCAL_DIR:/tmp/vecindad-storage}
   maintenance:
     token-cleanup-cron: ${TOKEN_CLEANUP_CRON:0 30 3 * * *}
     token-retention-days: ${TOKEN_RETENTION_DAYS:30}
+  whatsapp:
+    enabled: ${WHATSAPP_ENABLED:false}
+    verify-token: ${WHATSAPP_VERIFY_TOKEN:}
+    app-secret: ${WHATSAPP_APP_SECRET:}
+    api-version: ${WHATSAPP_API_VERSION:v21.0}
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    base-url: ${WHATSAPP_BASE_URL:https://graph.facebook.com}
+    ai-replies-enabled: ${WHATSAPP_AI_REPLIES_ENABLED:true}
+    include-financial-data: ${WHATSAPP_AI_INCLUDE_FINANCIAL_DATA:false}
+  ai:
+    enabled: ${AI_ENABLED:true}
+    provider: ${AI_PROVIDER:local}
+    gemini-api-key: ${GEMINI_API_KEY:}
+    gemini-model: ${GEMINI_MODEL:gemini-3.7-flash}
+    gemini-base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+    openai-api-key: ${OPENAI_API_KEY:}
+    openai-model: ${OPENAI_MODEL:gpt-4o-mini}
+    openai-base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    fallback-providers: ${AI_FALLBACK_PROVIDERS:local}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:20}
 

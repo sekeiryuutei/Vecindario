@@ -125,6 +125,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/admin/budget.page').then((m) => m.BudgetPage)
       },
       {
+        path: 'nomina',
+        canActivate: [permissionGuard('PAYROLL_VIEW', 'PAYROLL_MANAGE')],
+        loadComponent: () => import('./pages/admin/payroll.page').then((m) => m.PayrollPage)
+      },
+      {
         path: 'reportes',
         canActivate: [permissionGuard('REPORTS_VIEW')],
         loadComponent: () => import('./pages/admin/reports.page').then((m) => m.ReportsPage)

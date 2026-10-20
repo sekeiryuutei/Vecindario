@@ -11,7 +11,7 @@ Swagger UI: `/swagger-ui.html` · OpenAPI JSON: `/v3/api-docs`. Paginación: `?p
 | POST `/auth/select-tenant`, `/auth/change-password` · GET `/auth/me` | token |
 | GET `/public/config` | pública |
 | GET `/public/manifest.webmanifest` | pública (manifest PWA con `APP_NAME`) |
-| GET `/tenants/current` | miembro |
+| GET/PUT `/tenants/current` · PUT `/tenants/current/features/{feature}` | miembro / TENANT_SETTINGS_MANAGE (solo canales autogestionables) |
 | GET/POST `/tenant-members` · PATCH `/tenant-members/{id}/role` · POST `…/suspend`, `…/activate` · DELETE `…/{id}` · GET `…/{id}/history` | USERS_VIEW / USERS_MANAGE |
 | GET `/roles`, `/roles/permissions` · PUT `/roles/{rol}/permissions/{perm}` | ROLES_MANAGE |
 | GET/POST `/properties` · GET/PUT/DELETE `/properties/{id}` | PROPERTIES_* |
@@ -89,12 +89,15 @@ Códigos: `IMPORT_ALREADY_EXISTS` 409, `ROW_NOT_PENDING` 409, `ROW_NOT_APPLIED` 
 ## Fase 3c (Wompi y Certificados PDF)
 | Método y ruta | Permiso / Auth |
 |---|---|
-| POST `/my/payments/online` | FINANCE_VIEW_OWN (crea intención Wompi con firma íntegra) |
-| POST `/public/payments/wompi/webhook` | Pública (valida checksum SHA-256 e idempotencia) |
+| POST `/my/payments/online` · GET `/my/payments/online/{reference}` | FINANCE_VIEW_OWN (crea y consulta intenciones Wompi; mínimo `$1.500 COP`) |
+| POST `/public/wompi/events` | Pública (valida checksum SHA-256 e idempotencia) |
 | GET `/public/certificates/verify/{code}` | Pública (validador de autenticidad de certificados PDF emitidos) |
-| GET `/my/certificates/clearance` · `/my/certificates/statement` · `/my/certificates/ownership` | FINANCE_VIEW_OWN / UNITS_VIEW_OWN (PDFs OpenPDF firmados digitalmente con hash) |
-| GET `/certificates/history` | FINANCE_VIEW |
+| GET `/my/certificates/paz-y-salvo` · `/statement` · `/ownership` · `/history` | FINANCE_VIEW_OWN / UNITS_VIEW_OWN (PDFs OpenPDF firmados digitalmente con hash) |
+| GET `/certificates/units/{unitId}/paz-y-salvo` · `/statement` · `/ownership` · `/history` | FINANCE_VIEW (certificados administrativos) |
 | PUT `/platform/tenants/{id}/features` | SUPER_ADMIN_PLATFORM (activa/desactiva feature flags por copropiedad) |
+
+Códigos: `AMOUNT_TOO_LOW` 400 (mínimo Wompi), `INVALID_SIGNATURE` 400/401, `ONLINE_PAYMENTS_DISABLED` 403,
+`INTENT_NOT_PENDING` 409, `AMOUNT_MISMATCH` / `CURRENCY_MISMATCH` 400.
 
 ## Fase 4 (Zonas Comunes, Reservas, PQRS, Comunicados, Notificaciones, Documentos, Asambleas)
 | Método y ruta | Permiso / Auth |
@@ -137,5 +140,22 @@ Códigos: `IMPORT_ALREADY_EXISTS` 409, `ROW_NOT_PENDING` 409, `ROW_NOT_APPLIED` 
 | GET `/reports/portfolio` · `/reports/budget/{year}` · `/reports/maintenance` | REPORTS_VIEW |
 | GET `/reports/portfolio/export/csv` · `/reports/portfolio/export/pdf` | REPORTS_EXPORT |
 | GET `/cameras/status` · POST `/cameras/detect` | VEHICLES_VIEW / VEHICLES_MANAGE |
+
+## Fase 6/7 (Autogestión, Nómina y WhatsApp)
+| Método y ruta | Permiso / Auth |
+|---|---|
+| GET/PUT `/tenants/current` | Miembro / TENANT_SETTINGS_MANAGE |
+| PUT `/tenants/current/features/{feature}` | TENANT_SETTINGS_MANAGE; solo `WHATSAPP`, `CAMERAS`, `LPR` y `ASSEMBLIES` |
+| GET/PUT `/payroll/settings` | PAYROLL_VIEW / PAYROLL_MANAGE |
+| GET/POST `/payroll/employees` · GET/PUT/DELETE `/payroll/employees/{id}` | PAYROLL_VIEW / PAYROLL_MANAGE |
+| GET/POST `/payroll/runs` · GET `/payroll/runs/{id}` | PAYROLL_VIEW / PAYROLL_MANAGE |
+| POST `/payroll/runs/{id}/recalculate` · `/pay` · `/void` | PAYROLL_MANAGE |
+| GET `/payroll/runs/{id}/export.csv` | PAYROLL_VIEW (`Accept: text/csv`) |
+| GET `/public/whatsapp/webhook` | Pública (verificación de Meta Cloud API) |
+| POST `/public/whatsapp/webhook` | Pública (firma `X-Hub-Signature-256` e idempotencia) |
+
+La corrida de nómina usa numeración versionada por periodo (`NOM-AAAA-MM`, `NOM-AAAA-MM-2`, …) para permitir regenerar
+un periodo anulado. El webhook de WhatsApp resuelve teléfono → persona → copropiedad, exige el feature `WHATSAPP` y responde
+por el asistente configurado; si el proveedor remoto falla, usa el respaldo local.
 
 
