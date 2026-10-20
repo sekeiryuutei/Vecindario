@@ -96,6 +96,8 @@ jobs:
           AI_ENABLED=false
           AI_PROVIDER=local
           STORAGE_LOCAL_DIR=/app/storage
+          MINIO_ROOT_USER=ci-only-minio
+          MINIO_ROOT_PASSWORD=ci-only-minio-password
           ENV
       - name: Levantar la aplicación
         run: docker compose up -d --build
