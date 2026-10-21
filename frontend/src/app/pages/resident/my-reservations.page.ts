@@ -13,6 +13,7 @@ import {
   CreateMyReservationRequest,
   IntentResponse,
   MyUnit,
+  OnlinePaymentQuote,
   Reservation,
   TimeSlot
 } from '../../core/models';
@@ -77,7 +78,7 @@ import { EmptyStateComponent, ModalComponent, PageHeaderComponent } from '../../
                     <div class="table-actions">
                       @if ((item.status === 'PENDING_APPROVAL' || item.status === 'APPROVED' || item.status === 'PENDING_PAYMENT') && auth.hasPermission('RESERVATIONS_MANAGE_OWN')) {
                         @if (item.status === 'PENDING_PAYMENT') {
-                          <button type="button" class="btn btn-primary btn-sm" [disabled]="saving()" (click)="pay(item)">Pagar</button>
+                          <button type="button" class="btn btn-primary btn-sm" [disabled]="saving()" (click)="openPay(item)">Pagar</button>
                         }
                         <button type="button" class="btn btn-ghost btn-sm" (click)="openCancel(item)">Cancelar</button>
                       }
@@ -191,6 +192,25 @@ import { EmptyStateComponent, ModalComponent, PageHeaderComponent } from '../../
         <button type="button" class="btn btn-danger" [disabled]="saving()" (click)="confirmCancel()">{{ saving() ? 'Cancelando…' : 'Cancelar reserva' }}</button>
       </div>
     </app-modal>
+
+    <app-modal [open]="payOpen()" title="Pagar reserva" subtitle="El valor incluye la comisión de la pasarela y la tarifa de la plataforma." [narrow]="true" (closed)="payOpen.set(false)">
+      @if (payError()) { <div class="alert alert-error" style="margin-bottom:14px">{{ payError() }}</div> }
+      @if (payTarget(); as item) {
+        <div class="notice" style="margin-bottom:14px">{{ areaName(item.commonAreaId) }} · {{ item.startTime | date:'dd/MM/yyyy HH:mm' }} a {{ item.endTime | date:'HH:mm' }}</div>
+      }
+      @if (payQuote(); as q) {
+        <div class="detail-list">
+          <dt>Valor de la reserva</dt><dd>{{ (q.netAmountInCents ?? 0) / 100 | money }}</dd>
+          <dt>Comisión de la pasarela</dt><dd>{{ (q.commissionInCents ?? 0) / 100 | money }}</dd>
+          <dt>Tarifa de la plataforma</dt><dd>{{ (q.platformFeeInCents ?? 0) / 100 | money }}</dd>
+          <dt>Total a pagar</dt><dd><b>{{ (q.totalInCents ?? 0) / 100 | money }}</b></dd>
+        </div>
+      }
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" (click)="payOpen.set(false)">Volver</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving() || !payQuote()" (click)="confirmPay()">{{ saving() ? 'Redirigiendo…' : 'Ir a pagar' }}</button>
+      </div>
+    </app-modal>
   `
 })
 export class MyReservationsPage {
@@ -210,6 +230,10 @@ export class MyReservationsPage {
   readonly createOpen = signal(false);
   readonly cancelOpen = signal(false);
   readonly cancelTarget = signal<Reservation | null>(null);
+  readonly payOpen = signal(false);
+  readonly payTarget = signal<Reservation | null>(null);
+  readonly payQuote = signal<OnlinePaymentQuote | null>(null);
+  readonly payError = signal('');
   readonly error = signal('');
   readonly formError = signal('');
   readonly cancelError = signal('');
@@ -404,6 +428,7 @@ export class MyReservationsPage {
   async pay(item: Reservation): Promise<void> {
     if (!item.id) return;
     this.saving.set(true);
+    this.payError.set('');
     try {
       const intent = await firstValueFrom(this.api.post<IntentResponse>(`/my/reservations/${item.id}/checkout`, {}));
       if (intent.checkoutUrl) {
@@ -412,9 +437,33 @@ export class MyReservationsPage {
       }
       this.toast.error('No fue posible iniciar el pago en línea.');
     } catch (error) {
+      this.payError.set(describeError(error));
       this.toast.error(describeError(error));
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  /** Muestra el desglose del valor que se cobrará antes de enviar a la pasarela. */
+  async openPay(item: Reservation): Promise<void> {
+    this.payTarget.set(item);
+    this.payError.set('');
+    this.payQuote.set(null);
+    this.payOpen.set(true);
+    try {
+      const quote = await firstValueFrom(this.api.get<OnlinePaymentQuote>('/my/payments/online/quote', { amount: item.totalPrice ?? 0 }));
+      this.payQuote.set(quote);
+    } catch (error) {
+      this.payError.set(describeError(error));
+    }
+  }
+
+  async confirmPay(): Promise<void> {
+    const item = this.payTarget();
+    if (!item) return;
+    await this.pay(item);
+    if (!this.payError()) {
+      this.payOpen.set(false);
     }
   }
 

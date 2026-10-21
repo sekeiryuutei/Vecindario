@@ -51,7 +51,10 @@ public class WompiService {
             String publicKey,
             String checkoutUrl,
             String redirectUrl,
-            String status
+            String status,
+            long netAmountInCents,
+            long platformFeeInCents,
+            long commissionInCents
     ) {}
 
     private final OnlinePaymentPort onlinePayments;
@@ -63,11 +66,13 @@ public class WompiService {
     private final AuditService audit;
     private final AppProperties props;
     private final TenantIntegrationService integrations;
+    private final PlatformFeeCalculator fees;
     private final Clock clock;
 
     public WompiService(OnlinePaymentPort onlinePayments, TenantPort tenants, PropertyUnitPort units,
                         UnitRelationPort relations, PaymentService payments, ReservationService reservations,
-                        AuditService audit, AppProperties props, TenantIntegrationService integrations, Clock clock) {
+                        AuditService audit, AppProperties props, TenantIntegrationService integrations,
+                        PlatformFeeCalculator fees, Clock clock) {
         this.onlinePayments = onlinePayments;
         this.tenants = tenants;
         this.units = units;
@@ -77,6 +82,7 @@ public class WompiService {
         this.audit = audit;
         this.props = props;
         this.integrations = integrations;
+        this.fees = fees;
         this.clock = clock;
     }
 
@@ -103,7 +109,9 @@ public class WompiService {
             throw ApiException.badRequest("AMOUNT_TOO_LOW",
                     "El valor mínimo del pago en línea es de $1.500 COP.");
         }
-        long amountInCents = validatedAmount.multiply(BigDecimal.valueOf(100)).longValueExact();
+        long netAmountInCents = validatedAmount.multiply(BigDecimal.valueOf(100)).longValueExact();
+        PlatformFeeCalculator.Quote quote = fees.quote(netAmountInCents);
+        long amountInCents = quote.totalInCents();
 
         Tenant tenant = tenants.findById(tenantId).orElseThrow();
         String slug = tenant.slug();
@@ -115,12 +123,14 @@ public class WompiService {
         OnlinePaymentIntent intent = new OnlinePaymentIntent(
                 UUID.randomUUID(), reference, tenantId, unitId, null, me.userId(),
                 amountInCents, "COP", signature, OnlinePaymentIntent.IntentStatus.PENDING,
-                null, null, null, null, null, Instant.now(), Instant.now()
+                null, null, null, quote.platformFeeInCents(), netAmountInCents, null, null,
+                Instant.now(), Instant.now()
         );
         onlinePayments.insert(intent);
 
         audit.log(tenantId, "ONLINE_PAYMENT_INTENT_CREATED", "ONLINE_PAYMENT", reference, true,
-                Map.of("unitId", unitId.toString(), "amount", validatedAmount.toString()));
+                Map.of("unitId", unitId.toString(), "amount", validatedAmount.toString(),
+                        "total", amountInCents, "platformFee", quote.platformFeeInCents()));
 
         String redirectUrl = redirectUrl();
         UriComponentsBuilder checkout = UriComponentsBuilder.fromHttpUrl(CHECKOUT_URL)
@@ -134,7 +144,8 @@ public class WompiService {
         }
 
         return new IntentResponse(reference, amountInCents, "COP", signature, wompi.publicKey(),
-                checkout.build().encode().toUriString(), redirectUrl, "PENDING");
+                checkout.build().encode().toUriString(), redirectUrl, "PENDING",
+                netAmountInCents, quote.platformFeeInCents(), quote.commissionInCents());
     }
 
     /**
@@ -166,7 +177,9 @@ public class WompiService {
             throw ApiException.badRequest("AMOUNT_TOO_LOW",
                     "El valor mínimo del pago en línea es de $1.500 COP.");
         }
-        long amountInCents = amount.multiply(BigDecimal.valueOf(100)).longValueExact();
+        long netAmountInCents = amount.multiply(BigDecimal.valueOf(100)).longValueExact();
+        PlatformFeeCalculator.Quote quote = fees.quote(netAmountInCents);
+        long amountInCents = quote.totalInCents();
 
         Tenant tenant = tenants.findById(tenantId).orElseThrow();
         String prefix = tenant.slug().substring(0, Math.min(6, tenant.slug().length())).toUpperCase();
@@ -176,11 +189,13 @@ public class WompiService {
         OnlinePaymentIntent intent = new OnlinePaymentIntent(
                 UUID.randomUUID(), reference, tenantId, reservation.unitId(), reservationId, me.userId(),
                 amountInCents, "COP", signature, OnlinePaymentIntent.IntentStatus.PENDING,
-                null, null, null, null, null, Instant.now(), Instant.now()
+                null, null, null, quote.platformFeeInCents(), netAmountInCents, null, null,
+                Instant.now(), Instant.now()
         );
         onlinePayments.insert(intent);
         audit.log(tenantId, "RESERVATION_PAYMENT_INTENT_CREATED", "ONLINE_PAYMENT", reference, true,
-                Map.of("reservationId", reservationId.toString(), "amount", amount.toString()));
+                Map.of("reservationId", reservationId.toString(), "amount", amount.toString(),
+                        "total", amountInCents, "platformFee", quote.platformFeeInCents()));
 
         String redirectUrl = redirectUrl();
         UriComponentsBuilder checkout = UriComponentsBuilder.fromHttpUrl(CHECKOUT_URL)
@@ -193,7 +208,8 @@ public class WompiService {
             checkout.queryParam("redirect-url", redirectUrl);
         }
         return new IntentResponse(reference, amountInCents, "COP", signature, wompi.publicKey(),
-                checkout.build().encode().toUriString(), redirectUrl, "PENDING");
+                checkout.build().encode().toUriString(), redirectUrl, "PENDING",
+                netAmountInCents, quote.platformFeeInCents(), quote.commissionInCents());
     }
 
     /**
@@ -242,7 +258,7 @@ public class WompiService {
         if ("APPROVED".equals(status)) {
             validateApprovedTransaction(tx, intent);
             Tenant tenant = tenants.findById(intent.tenantId()).orElseThrow();
-            BigDecimal amount = BigDecimal.valueOf(intent.amountInCents()).divide(BigDecimal.valueOf(100));
+            BigDecimal amount = BigDecimal.valueOf(netAmountOf(intent)).divide(BigDecimal.valueOf(100));
             TenantRef ref = new TenantRef(tenant.id(), tenant.schemaName());
 
             PaymentService.PaymentResult res = TenantContext.callAs(ref, () -> {
@@ -273,7 +289,9 @@ public class WompiService {
                 return;
             }
             audit.log(intent.tenantId(), "ONLINE_PAYMENT_APPROVED", "ONLINE_PAYMENT", tx.reference(), true,
-                    Map.of("wompiTxId", tx.id(), "amount", amount.toString(), "paymentId", res.payment().id().toString()));
+                    Map.of("wompiTxId", tx.id(), "amount", amount.toString(), "paymentId", res.payment().id().toString(),
+                            "totalCharged", intent.amountInCents(),
+                            "platformFee", intent.platformFeeInCents() == null ? 0L : intent.platformFeeInCents()));
             return;
         }
 
@@ -291,6 +309,14 @@ public class WompiService {
 
         audit.log(intent.tenantId(), "ONLINE_PAYMENT_" + newStatus.name(), "ONLINE_PAYMENT", tx.reference(), false,
                 Map.of("wompiTxId", tx.id() != null ? tx.id() : ""));
+    }
+
+    /**
+     * Valor que se acredita a la copropiedad. Las intenciones anteriores a la
+     * política de tarifas no tienen el campo y se acreditan íntegras.
+     */
+    private long netAmountOf(OnlinePaymentIntent intent) {
+        return intent.netAmountInCents() == null ? intent.amountInCents() : intent.netAmountInCents();
     }
 
     public Optional<OnlinePaymentIntent> getIntent(String reference) {

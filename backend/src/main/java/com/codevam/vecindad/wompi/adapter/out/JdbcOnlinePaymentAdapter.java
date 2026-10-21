@@ -35,6 +35,8 @@ public class JdbcOnlinePaymentAdapter implements OnlinePaymentPort {
             rs.getString("wompi_tx_id"),
             rs.getString("payment_method"),
             rs.getObject("fee_in_cents") != null ? rs.getLong("fee_in_cents") : null,
+            rs.getObject("platform_fee_in_cents") != null ? rs.getLong("platform_fee_in_cents") : null,
+            rs.getObject("net_amount_in_cents") != null ? rs.getLong("net_amount_in_cents") : null,
             rs.getString("error_message"),
             rs.getObject("payment_id", UUID.class),
             toInstant(rs.getTimestamp("created_at")),
@@ -49,10 +51,13 @@ public class JdbcOnlinePaymentAdapter implements OnlinePaymentPort {
     public OnlinePaymentIntent insert(OnlinePaymentIntent intent) {
         jdbc.update(
                 "INSERT INTO public.online_payment_intents (id, reference, tenant_id, unit_id, reservation_id, user_id, "
-                        + "amount_in_cents, currency, signature, status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                        + "amount_in_cents, currency, signature, status, platform_fee_in_cents, net_amount_in_cents, "
+                        + "created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
                 intent.id(), intent.reference(), intent.tenantId(), intent.unitId(), intent.reservationId(), intent.userId(),
-                intent.amountInCents(), intent.currency(), intent.signature(), intent.status().name()
+                intent.amountInCents(), intent.currency(), intent.signature(), intent.status().name(),
+                intent.platformFeeInCents() == null ? 0L : intent.platformFeeInCents(),
+                intent.netAmountInCents() == null ? intent.amountInCents() : intent.netAmountInCents()
         );
         return findByReference(intent.reference()).orElseThrow();
     }

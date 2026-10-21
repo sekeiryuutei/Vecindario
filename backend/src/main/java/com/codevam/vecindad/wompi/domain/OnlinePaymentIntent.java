@@ -17,6 +17,8 @@ public record OnlinePaymentIntent(
         String wompiTxId,
         String paymentMethod,
         Long feeInCents,
+        Long platformFeeInCents,
+        Long netAmountInCents,
         String errorMessage,
         UUID paymentId,
         Instant createdAt,

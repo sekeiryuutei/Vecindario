@@ -772,6 +772,27 @@ export interface IntentResponse {
   checkoutUrl?: string;
   redirectUrl?: string;
   status?: string;
+  netAmountInCents?: number;
+  platformFeeInCents?: number;
+  commissionInCents?: number;
+}
+
+export interface OnlinePaymentsSummary {
+  approvedPayments?: number;
+  pendingPayments?: number;
+  chargedInCents?: number;
+  creditedInCents?: number;
+  platformFeesInCents?: number;
+  wompiFeesInCents?: number;
+  platformRevenueInCents?: number;
+}
+
+export interface OnlinePaymentQuote {
+  netAmountInCents?: number;
+  platformFeeInCents?: number;
+  commissionInCents?: number;
+  totalInCents?: number;
+  currency?: string;
 }
 
 export interface VoteRequest {
@@ -1560,6 +1581,8 @@ export interface OnlinePaymentIntent {
   wompiTxId?: string;
   paymentMethod?: string;
   feeInCents?: number;
+  platformFeeInCents?: number;
+  netAmountInCents?: number;
   errorMessage?: string;
   paymentId?: string;
   createdAt?: string;

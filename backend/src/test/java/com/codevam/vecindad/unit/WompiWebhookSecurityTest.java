@@ -5,6 +5,7 @@ import com.codevam.vecindad.billing.application.PaymentService;
 import com.codevam.vecindad.billing.domain.Payment;
 import com.codevam.vecindad.billing.domain.PaymentMethod;
 import com.codevam.vecindad.config.AppProperties;
+import com.codevam.vecindad.config.FeeProperties;
 import com.codevam.vecindad.integrations.TenantIntegrationService;
 import com.codevam.vecindad.people.application.port.out.UnitRelationPort;
 import com.codevam.vecindad.properties.application.port.out.PropertyUnitPort;
@@ -14,6 +15,7 @@ import com.codevam.vecindad.shared.tenancy.TenantContext;
 import com.codevam.vecindad.tenancy.application.port.out.TenantPort;
 import com.codevam.vecindad.tenancy.domain.Tenant;
 import com.codevam.vecindad.tenancy.domain.TenantStatus;
+import com.codevam.vecindad.wompi.application.PlatformFeeCalculator;
 import com.codevam.vecindad.wompi.application.WompiService;
 import com.codevam.vecindad.wompi.application.port.out.OnlinePaymentPort;
 import com.codevam.vecindad.wompi.domain.OnlinePaymentIntent;
@@ -78,13 +80,19 @@ class WompiWebhookSecurityTest {
                 new AppProperties.Maintenance("0 30 3 * * *", 30));
 
         service = new WompiService(onlinePayments, tenants, units, relations, payments, reservations,
-                audit, props, integrations, Clock.systemUTC());
+                audit, props, integrations, fees(), Clock.systemUTC());
 
         tenantId = UUID.randomUUID();
         pendingIntent = new OnlinePaymentIntent(UUID.randomUUID(), REFERENCE, tenantId, UUID.randomUUID(),
                 null, UUID.randomUUID(), 500_000L, "COP", "signature", OnlinePaymentIntent.IntentStatus.PENDING,
-                null, null, null, null, null, Instant.now(), Instant.now());
+                null, null, null, null, 500_000L, null, null, Instant.now(), Instant.now());
         when(onlinePayments.findByReference(REFERENCE)).thenReturn(Optional.of(pendingIntent));
+    }
+
+    private PlatformFeeCalculator fees() {
+        return new PlatformFeeCalculator(new FeeProperties(true, new java.math.BigDecimal("2000"),
+                new java.math.BigDecimal("0.0265"), new java.math.BigDecimal("700"),
+                new java.math.BigDecimal("0.19")));
     }
 
     @Test

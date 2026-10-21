@@ -196,6 +196,16 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 - Demo Sur tiene `ONLINE_PAYMENTS=false`: el propietario ve el aviso de que los pagos en línea no están habilitados y la
   API responde `403 ONLINE_PAYMENTS_DISABLED` (no es un problema de permisos del rol).
 
+### Desglose de la tarifa por pago en línea
+
+1. Entrar como `propietario@demo-norte.local` en Demo Norte y abrir *Estado de cuenta*.
+2. Escribir un valor (por ejemplo `25000`) y verificar que aparecen *Valor a pagar*, *Comisión de la pasarela*,
+   *Tarifa de la plataforma* y *Total a pagar*.
+3. Comprobar que la suma coincide con el total y que `GET /api/v1/my/payments/online/quote?amount=25000` devuelve los
+   mismos valores: `netAmountInCents` 2500000, `platformFeeInCents` 200000 y `totalInCents` 2873930.
+4. Crear la intención y verificar que la URL de checkout cobra el total y que la referencia queda en estado `PENDING`.
+5. Con la firma del webhook, confirmar que el pago acreditado en cartera es **el valor de la deuda** y no el total.
+
 
 ### Flujo integrado de 10 minutos
 

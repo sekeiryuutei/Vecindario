@@ -163,6 +163,7 @@ por el asistente configurado; si el proveedor remoto falla, usa el respaldo loca
 |---|---|
 | GET `/my/tenant-overview` | Miembro (resumen de todas las copropiedades asignadas) |
 | GET `/platform/tenants/{tenantId}/integrations` | SUPER_ADMIN_PLATFORM (estado enmascarado) |
+| GET `/platform/online-payments/summary` | SUPER_ADMIN_PLATFORM (cobros, tarifa de plataforma y comisión de la pasarela) |
 | PUT `/platform/tenants/{tenantId}/integrations/wompi` | SUPER_ADMIN_PLATFORM |
 | PUT `/platform/tenants/{tenantId}/integrations/ai` | SUPER_ADMIN_PLATFORM |
 | DELETE `/platform/tenants/{tenantId}/integrations/{WOMPI\|AI}` | SUPER_ADMIN_PLATFORM (vuelve a los valores globales) |
@@ -171,6 +172,11 @@ por el asistente configurado; si el proveedor remoto falla, usa el respaldo loca
 administrarla y un bloque de métricas (inmuebles, personas, PQRS abiertas, incidentes abiertos, reservas próximas,
 paquetes pendientes y cartera en mora con su importe). El frontend lo usa como panel general antes de elegir
 copropiedad.
+
+`GET /my/payments/online/quote?amount=` cotiza un pago en línea: devuelve `netAmountInCents` (deuda), `platformFeeInCents`
+(tarifa de la plataforma), `commissionInCents` (comisión estimada de la pasarela) y `totalInCents` (lo que se cobra). La
+creación de la intención (`POST /my/payments/online` y `POST /my/reservations/{id}/checkout`) devuelve los mismos valores
+en `netAmountInCents`, `platformFeeInCents` y `commissionInCents`; `amountInCents` es el total cobrado.
 
 Las integraciones por copropiedad guardan las credenciales de Wompi y del proveedor de IA cifradas con AES-GCM
 (`INTEGRATIONS_ENCRYPTION_KEY`); la API nunca devuelve llaves privadas ni secretos. La llave pública de Wompi sí se

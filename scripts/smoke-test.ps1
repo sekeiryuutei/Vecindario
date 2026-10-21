@@ -203,19 +203,24 @@ Check 'monto menor al minimo Wompi rechazado (400)' ($wpLow.Status -eq 400)
 $wpReq = Call POST '/my/payments/online' $ot @{ unitId = $unit101; amount = 25000; notes = 'Pago cuota en linea' }
 Check 'intencion Wompi creada (201)' ($wpReq.Status -eq 201 -and $wpReq.Json.reference -like 'WP-*' -and $wpReq.Json.signature.Length -eq 64)
 $wpRef = $wpReq.Json.reference
+$wpNet = $wpReq.Json.netAmountInCents
+$wpTotal = $wpReq.Json.amountInCents
+Check 'total con comision de pasarela y tarifa de plataforma' ($wpNet -eq 2500000 -and $wpTotal -gt $wpNet -and $wpReq.Json.platformFeeInCents -ge 0)
+$wpQuote = Call GET "/my/payments/online/quote?amount=25000" $ot
+Check 'cotizacion de pago en linea (200)' ($wpQuote.Status -eq 200 -and $wpQuote.Json.totalInCents -gt 2500000)
 
 $wpStatus = Call GET "/my/payments/online/$wpRef" $ot
 Check 'intencion en estado PENDING' ($wpStatus.Status -eq 200 -and $wpStatus.Json.status -eq 'PENDING')
 
 $wpTimestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$wpChecksum = Sha256Hex("tx-$wpRef" + "APPROVED" + "2500000" + "COP" + "$wpTimestamp" + "$($envMap['WOMPI_EVENTS_SECRET'])")
+$wpChecksum = Sha256Hex("tx-$wpRef" + "APPROVED" + "$wpTotal" + "COP" + "$wpTimestamp" + "$($envMap['WOMPI_EVENTS_SECRET'])")
 $wpEvt = @{
   event = 'transaction.updated'
   data = @{
     transaction = @{
       id = "tx-$wpRef"
       reference = $wpRef
-      amount_in_cents = 2500000
+      amount_in_cents = $wpTotal
       currency = 'COP'
       status = 'APPROVED'
       payment_method_type = 'CARD'
@@ -234,6 +239,10 @@ Check 'webhook Wompi procesado (200)' ($hook.Status -eq 200)
 
 $wpApproved = Call GET "/my/payments/online/$wpRef" $ot
 Check 'intencion actualizada a APPROVED' ($wpApproved.Status -eq 200 -and $wpApproved.Json.status -eq 'APPROVED' -and $wpApproved.Json.paymentId)
+
+$wpStatement = Call GET "/my/statement?unitId=$unit101" $ot
+$wpEntry = @($wpStatement.Json.lines | Where-Object { $_.entryType -eq 'PAYMENT' -and $_.paymentId -eq $wpApproved.Json.paymentId })[0]
+Check 'pago acreditado por el valor de la deuda sin la tarifa' ($wpEntry -and [math]::Abs([math]::Abs([double]$wpEntry.amount) - 25000) -lt 0.01)
 
 $hookReplay = Call POST '/public/wompi/events' $null $wpEvt
 Check 'webhook Wompi idempotente (200)' ($hookReplay.Status -eq 200)

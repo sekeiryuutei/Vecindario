@@ -1,6 +1,7 @@
 package com.codevam.vecindad.wompi.adapter.in.web;
 
 import com.codevam.vecindad.shared.error.ApiException;
+import com.codevam.vecindad.wompi.application.PlatformFeeCalculator;
 import com.codevam.vecindad.wompi.application.WompiService;
 import com.codevam.vecindad.wompi.domain.OnlinePaymentIntent;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,10 +28,35 @@ public class OnlinePaymentController {
             @Size(max = 300) String notes
     ) {}
 
-    private final WompiService wompi;
+    public record QuoteResponse(
+            long netAmountInCents,
+            long platformFeeInCents,
+            long commissionInCents,
+            long totalInCents,
+            String currency
+    ) {}
 
-    public OnlinePaymentController(WompiService wompi) {
+    private static final BigDecimal MINIMUM_ONLINE_AMOUNT = new BigDecimal("1500.00");
+
+    private final WompiService wompi;
+    private final PlatformFeeCalculator fees;
+
+    public OnlinePaymentController(WompiService wompi, PlatformFeeCalculator fees) {
         this.wompi = wompi;
+        this.fees = fees;
+    }
+
+    @Operation(summary = "Calcula el valor total de un pago en línea con la comisión de la pasarela y la tarifa de la plataforma")
+    @GetMapping("/quote")
+    @PreAuthorize("hasAuthority('PAYMENTS_ONLINE_CREATE') or hasAuthority('PAYMENTS_CREATE')")
+    public QuoteResponse quote(@RequestParam @DecimalMin("1") BigDecimal amount) {
+        long netAmountInCents = amount.multiply(BigDecimal.valueOf(100)).longValueExact();
+        if (netAmountInCents < MINIMUM_ONLINE_AMOUNT.multiply(BigDecimal.valueOf(100)).longValueExact()) {
+            throw ApiException.badRequest("AMOUNT_TOO_LOW", "El valor mínimo del pago en línea es de $1.500 COP.");
+        }
+        PlatformFeeCalculator.Quote quote = fees.quote(netAmountInCents);
+        return new QuoteResponse(quote.netAmountInCents(), quote.platformFeeInCents(),
+                quote.commissionInCents(), quote.totalInCents(), "COP");
     }
 
     @Operation(summary = "Crea una intención de pago en línea para un inmueble propio. Retorna la firma de integridad y la URL de checkout de Wompi.")

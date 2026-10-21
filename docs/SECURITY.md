@@ -55,7 +55,9 @@ Cambiar `INTEGRATIONS_ENCRYPTION_KEY` exige volver a cargar todas las credencial
 
 - Nginx aplica CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
   `Permissions-Policy` (cámara solo para el escáner QR) y HSTS cuando el proxy TLS envía `X-Forwarded-Proto: https`.
-- Límites de tasa: autenticación `20r/m` con burst 10; API general `30r/s` con burst 60; conexiones por IP limitadas.
+- Límites de tasa: autenticación `60r/m` con burst 20 en el borde; el backend limita el inicio de sesión a `10` intentos
+  por minuto y por IP+correo, con bloqueo temporal de la cuenta tras `5` intentos fallidos; API general `30r/s` con burst 60;
+  conexiones por IP limitadas.
 - PostgreSQL, Redis, backend y frontend se publican solo en `127.0.0.1`; únicamente Nginx escucha en todas las interfaces.
 - Contenedores con `no-new-privileges`; el backend corre como usuario sin privilegios, con filesystem de solo lectura y
   `/tmp` efímero.

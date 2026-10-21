@@ -11,4 +11,17 @@ test.describe('Portal del residente', () => {
     await expect(page.getByRole('heading', { name: 'Estado de cuenta' })).toBeVisible();
     await expect(page.getByText('Movimientos del período')).toBeVisible();
   });
+
+  test('el propietario ve el desglose de la tarifa antes de pagar en línea', async ({ page }) => {
+    await loginTenant(page, 'propietario@demo-norte.local', 'Demo Norte');
+
+    await page.getByRole('navigation', { name: 'Menú principal' })
+      .getByRole('link', { name: 'Estado de cuenta' }).click();
+    await expect(page.getByRole('heading', { name: 'Estado de cuenta' })).toBeVisible();
+
+    await page.locator('#amount').fill('25000');
+    await expect(page.getByText('Tarifa de la plataforma')).toBeVisible();
+    await expect(page.getByText('Comisión de la pasarela')).toBeVisible();
+    await expect(page.getByText('Total a pagar')).toBeVisible();
+  });
 });

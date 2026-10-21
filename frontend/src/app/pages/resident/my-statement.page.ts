@@ -6,7 +6,7 @@ import { AuthService } from '../../core/auth.service';
 import { MoneyPipe } from '../../core/format.pipes';
 import { TenantContextService } from '../../core/tenant-context.service';
 import { label, statusTone } from '../../core/labels';
-import { IntentResponse, MyUnit, Statement } from '../../core/models';
+import { IntentResponse, MyUnit, OnlinePaymentQuote, Statement } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { describeError, endOfMonth, startOfMonth } from '../../core/utils';
 import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.components';
@@ -84,7 +84,7 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
               <div class="notice">No tienes saldo pendiente. Si realizas un abono, quedará como saldo a favor.</div>
               <div class="field" style="margin-top:14px">
                 <label for="amount">Valor del abono</label>
-                <input id="amount" name="amount" type="number" min="1500" step="100" class="input" [(ngModel)]="amount">
+                <input id="amount" name="amount" type="number" min="1500" step="100" class="input" [(ngModel)]="amount" (ngModelChange)="refreshQuote()">
               </div>
               <div class="form-actions">
                 <button type="button" class="btn btn-primary" [disabled]="paying() || amount < 1500" (click)="payOnline()">{{ paying() ? 'Creando pago…' : 'Pagar en línea' }}</button>
@@ -93,7 +93,7 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
               <div class="row" style="align-items:flex-end">
                 <div class="field" style="flex:1">
                   <label for="amount">Valor a pagar</label>
-                  <input id="amount" name="amount" type="number" min="1500" step="100" class="input" [(ngModel)]="amount">
+                  <input id="amount" name="amount" type="number" min="1500" step="100" class="input" [(ngModel)]="amount" (ngModelChange)="refreshQuote()">
                   <span class="hint">Saldo pendiente: {{ data.closingBalance | money }}</span>
                 </div>
                 <button type="button" class="btn btn-secondary" (click)="amount = data.closingBalance ?? 0">Pagar todo</button>
@@ -106,6 +106,14 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
                 <button type="button" class="btn btn-primary" [disabled]="paying() || amount < 1500" (click)="payOnline()">{{ paying() ? 'Creando pago…' : 'Ir a pagar' }}</button>
               </div>
               <div class="notice" style="margin-top:14px">Serás dirigido a la pasarela de pagos. Al finalizar podrás consultar el resultado en este portal.</div>
+            }
+            @if (quote(); as q) {
+              <div class="notice" style="margin-top:14px">
+                <div class="row" style="justify-content:space-between"><span>Valor a pagar</span><b>{{ (q.netAmountInCents ?? 0) / 100 | money }}</b></div>
+                <div class="row" style="justify-content:space-between"><span>Comisión de la pasarela</span><b>{{ (q.commissionInCents ?? 0) / 100 | money }}</b></div>
+                <div class="row" style="justify-content:space-between"><span>Tarifa de la plataforma</span><b>{{ (q.platformFeeInCents ?? 0) / 100 | money }}</b></div>
+                <div class="row" style="justify-content:space-between"><span>Total a pagar</span><b>{{ (q.totalInCents ?? 0) / 100 | money }}</b></div>
+              </div>
             }
             @if (paymentError()) { <div class="alert alert-error" style="margin-top:14px">{{ paymentError() }}</div> }
           </div>
@@ -154,6 +162,7 @@ export class MyStatementPage {
   readonly paying = signal(false);
   readonly error = signal('');
   readonly paymentError = signal('');
+  readonly quote = signal<OnlinePaymentQuote | null>(null);
   unitId = '';
   from = startOfMonth();
   to = endOfMonth();
@@ -192,6 +201,7 @@ export class MyStatementPage {
       const result = await firstValueFrom(this.api.get<Statement>('/my/statement', { unitId: this.unitId, from: this.from, to: this.to }));
       this.statement.set(result);
       this.amount = Math.max(0, Number(result.closingBalance ?? 0));
+      await this.refreshQuote();
     } catch (error) {
       this.statement.set(null);
       this.error.set(describeError(error));
@@ -211,6 +221,20 @@ export class MyStatementPage {
       this.toast.error(describeError(error));
     } finally {
       this.downloading.set(false);
+    }
+  }
+
+  /** Calcula el total real que se cobra: deuda + comisión de la pasarela + tarifa de la plataforma. */
+  async refreshQuote(): Promise<void> {
+    if (!this.onlinePaymentsEnabled() || !this.amount || this.amount < 1500) {
+      this.quote.set(null);
+      return;
+    }
+    try {
+      const result = await firstValueFrom(this.api.get<OnlinePaymentQuote>('/my/payments/online/quote', { amount: this.amount }));
+      this.quote.set(result);
+    } catch {
+      this.quote.set(null);
     }
   }
 

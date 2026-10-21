@@ -150,7 +150,9 @@ Antes de exponer el servicio:
 2. `APP_PUBLIC_URL` y `WOMPI_REDIRECT_URL` con HTTPS público; `CORS_ALLOWED_ORIGINS` solo con orígenes HTTPS reales y,
    si se compila la app nativa, los orígenes exactos `https://localhost` y `capacitor://localhost`.
 3. Claves nuevas y robustas para PostgreSQL, Redis, JWT (48+ bytes), Wompi, SMTP y WhatsApp. En Wompi, el secreto de
-   integridad y el de eventos deben ser distintos; el redirect debe ser HTTPS público.
+   integridad y el de eventos deben ser distintos; el redirect debe ser HTTPS público. Define además la política de cobro
+   en línea: `PLATFORM_FEE_AMOUNT` (tarifa de la plataforma, `2000` COP por defecto) y `WOMPI_COMMISSION_RATE`,
+   `WOMPI_COMMISSION_FIXED` y `WOMPI_COMMISSION_IVA_RATE` (comisión estimada de la pasarela).
 4. `INTEGRATIONS_ENCRYPTION_KEY` con 32 bytes o más (openssl rand -hex 48): cifra las credenciales de Wompi y del
    proveedor de IA que cada copropiedad defina desde el área de plataforma. Sin esta variable el backend no arranca en
    producción.

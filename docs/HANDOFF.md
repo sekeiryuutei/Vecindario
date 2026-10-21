@@ -53,8 +53,8 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 | **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **118 unitarias + 51 IT, smoke integral OK** |
 | **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build`, Playwright 5/5 y Docker build multi-stage OK** |
 | **Autogestión y nómina** | Edición de datos de la copropiedad y activación de canales autogestionables (`WHATSAPP`, `CAMERAS`, `LPR`, `ASSEMBLIES`); pagos en línea sigue siendo una decisión de plataforma. Nómina por copropiedad con parámetros, empleados, periodos, cálculo de aportes/provisiones, pago, anulación y exportación CSV. | **Completada** | **Pruebas unitarias, smoke y flujo API/UI verificados** |
-| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 7/7; cobertura 53,46% de líneas** |
-| **Reservas, pagos e integraciones** | Términos de uso y ventanas de aprobación por zona común, reservas con pago previo (`PENDING_PAYMENT`) facturadas con Wompi, panel general multi-copropiedad (`/my/tenant-overview`) y credenciales de Wompi/IA cifradas (AES-GCM) y administradas por copropiedad desde el área de plataforma. | **Completada** | **143 unitarias + 51 IT, smoke de 23 secciones OK, E2E 7/7** |
+| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 8/8; cobertura 53,46% de líneas** |
+| **Reservas, pagos e integraciones** | Términos de uso y ventanas de aprobación por zona común, reservas con pago previo (`PENDING_PAYMENT`) facturadas con Wompi, panel general multi-copropiedad (`/my/tenant-overview`) y credenciales de Wompi/IA cifradas (AES-GCM) y administradas por copropiedad desde el área de plataforma. | **Completada** | **149 unitarias + 51 IT, smoke de 23 secciones OK, E2E 8/8** |
 
 ---
 
@@ -171,7 +171,7 @@ docker logs vecindad_backend --tail 50
 # 4. Ejecutar pruebas unitarias, integración y cobertura
 cd backend
 mvn -B verify
-# Resultado esperado: 143 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
+# Resultado esperado: 149 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
 cd ..
 
 # 5. Compilar el frontend y ejecutar Playwright
@@ -186,7 +186,7 @@ cd ..
 
 # 6. Smoke test integral (23 secciones)
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
-# Resultado esperado: build sin errores, Playwright 7/7 y mensaje final "TODO OK"
+# Resultado esperado: build sin errores, Playwright 8/8 y mensaje final "TODO OK"
 ```
 
 ### 4.2 Credenciales de Demostración
@@ -268,11 +268,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 ## 7. Estado de entrega y pendientes externos
 
-**Verificado en el entorno local:** arranque Docker, migraciones, 143 unitarias, 51 IT, cobertura 53,46% de líneas,
-Playwright 7/7, smoke de 23 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
+**Verificado en el entorno local:** arranque Docker, migraciones, 149 unitarias, 51 IT, cobertura 53,46% de líneas,
+Playwright 8/8, smoke de 23 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
 webhook de WhatsApp firmado/idempotente, envío y recepción real de WhatsApp, pago Wompi aprobado en sandbox con webhook
 reconciliado, reservas con términos y aprobación previa, panel general multi-copropiedad, integraciones por copropiedad
-cifradas y configuración productiva fail-closed.
+cifradas, desglose de comisión y tarifa por pago en línea y configuración productiva fail-closed.
 
 **Pendiente para producción (requiere decisiones o credenciales del propietario):**
 
@@ -287,6 +287,8 @@ cifradas y configuración productiva fail-closed.
 - WhatsApp: número de negocio real, token rotado, app de Meta dedicada, plantillas aprobadas y webhook público. El envío
   y la recepción real ya se validaron con el token actual; ese token se usará temporalmente en otra aplicación, por lo
   que el canal quedó deshabilitado en el `.env` local. No debe reutilizarse en producción sin una app dedicada.
-- Almacenamiento S3 compatible (aún solo existe `LocalStorageAdapter`), firma/publicación Android/iOS, notificaciones
-  push FCM/APNs y el modelo de cobro por pago (la comisión de Wompi hace inviable una tarifa de 2–5 COP).
+- Almacenamiento S3 compatible (aún solo existe `LocalStorageAdapter`), firma/publicación Android/iOS y notificaciones
+  push FCM/APNs. El cobro por pago en línea ya está implementado (deuda + comisión de la pasarela + tarifa de la
+  plataforma, por defecto $2.000); falta definir en producción cómo se liquida la tarifa al operador de la plataforma
+  (Wompi con tarifas avanzadas/split o dispersión a terceros desde la cuenta de la plataforma).
 - Respaldos programados, restauración probada y monitoreo/alertas del host y los contenedores.

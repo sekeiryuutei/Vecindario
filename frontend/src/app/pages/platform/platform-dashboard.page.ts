@@ -7,10 +7,12 @@ import { label, statusTone } from '../../core/labels';
 import {
   AuditLogView,
   Company,
+  OnlinePaymentsSummary,
   PageResultAuditLogView,
   PageResultTenantView,
   TenantView
 } from '../../core/models';
+import { MoneyPipe } from '../../core/format.pipes';
 import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.components';
 
 interface FeatureStat {
@@ -23,7 +25,7 @@ interface FeatureStat {
 @Component({
   selector: 'app-platform-dashboard-page',
   standalone: true,
-  imports: [DatePipe, RouterLink, PageHeaderComponent, EmptyStateComponent],
+  imports: [DatePipe, RouterLink, PageHeaderComponent, EmptyStateComponent, MoneyPipe],
   template: `
     <app-page-header title="Plataforma" subtitle="Estado general de las empresas administradoras y las copropiedades de la plataforma.">
       <a class="btn btn-secondary" routerLink="/app/plataforma/empresas">Empresas</a>
@@ -41,6 +43,18 @@ interface FeatureStat {
       </div>
 
       <div class="grid grid-2" style="margin-top:18px">
+        <div class="card">
+          <div class="card-header"><div><h2>Pagos en línea</h2><p>Ingreso de la plataforma por la tarifa fija y la comisión de la pasarela.</p></div></div>
+          <div class="card-body">
+            <div class="grid grid-2">
+              <div class="stat"><div class="stat-label">Pagos aprobados</div><div class="stat-value">{{ payments()?.approvedPayments ?? 0 }}</div><div class="stat-hint">{{ payments()?.pendingPayments ?? 0 }} pendientes</div></div>
+              <div class="stat"><div class="stat-label">Cobrado a los usuarios</div><div class="stat-value">{{ (payments()?.chargedInCents ?? 0) / 100 | money }}</div><div class="stat-hint">Total en la pasarela</div></div>
+              <div class="stat"><div class="stat-label">Tarifa de la plataforma</div><div class="stat-value">{{ (payments()?.platformFeesInCents ?? 0) / 100 | money }}</div><div class="stat-hint">Cobro fijo por pago</div></div>
+              <div class="stat accent"><div class="stat-label">Ingreso de la plataforma</div><div class="stat-value">{{ (payments()?.platformRevenueInCents ?? 0) / 100 | money }}</div><div class="stat-hint">Tarifa + comisión de la pasarela</div></div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header"><div><h2>Copropiedades recientes</h2><p>Últimas copropiedades registradas en la plataforma.</p></div><a class="btn btn-secondary btn-sm" routerLink="/app/plataforma/copropiedades">Ver todas</a></div>
           @if (!tenants().length) {
@@ -131,6 +145,7 @@ export class PlatformDashboardPage {
   readonly tenants = signal<TenantView[]>([]);
   readonly companies = signal<Company[]>([]);
   readonly audit = signal<AuditLogView[]>([]);
+  readonly payments = signal<OnlinePaymentsSummary | null>(null);
   readonly loading = signal(true);
   readonly activeTenants = computed(() => this.tenants().filter((tenant) => tenant.status === 'ACTIVE').length);
   readonly provisioningTenants = computed(() => this.tenants().filter((tenant) => tenant.status === 'PROVISIONING').length);
@@ -155,14 +170,16 @@ export class PlatformDashboardPage {
   private async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const [tenants, companies, audit] = await Promise.all([
+      const [tenants, companies, audit, payments] = await Promise.all([
         this.safe(this.api.get<PageResultTenantView>('/platform/tenants', { page: 0, size: 100 })),
         this.safe(this.api.get<Company[]>('/platform/companies')),
-        this.safe(this.api.get<PageResultAuditLogView>('/platform/audit', { page: 0, size: 8 }))
+        this.safe(this.api.get<PageResultAuditLogView>('/platform/audit', { page: 0, size: 8 })),
+        this.safe(this.api.get<OnlinePaymentsSummary>('/platform/online-payments/summary'))
       ]);
       this.tenants.set(tenants?.content ?? []);
       this.companies.set(companies ?? []);
       this.audit.set(audit?.content ?? []);
+      this.payments.set(payments);
     } finally {
       this.loading.set(false);
     }

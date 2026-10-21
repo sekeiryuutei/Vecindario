@@ -60,6 +60,13 @@ import { MoneyPipe } from '../../core/format.pipes';
                 <div class="stat-value">{{ (intent()!.amountInCents || 0) / 100 | money:intent()!.currency }}</div>
                 <div class="stat-hint">{{ intent()!.createdAt | date:'dd/MM/yyyy HH:mm' }}</div>
               </div>
+              @if ((intent()!.platformFeeInCents || 0) > 0) {
+                <div class="detail-list" style="max-width:320px;margin:16px auto 0;text-align:left">
+                  <dt>Valor acreditado</dt><dd>{{ (intent()!.netAmountInCents || 0) / 100 | money:intent()!.currency }}</dd>
+                  <dt>Comisión de la pasarela</dt><dd>{{ ((intent()!.amountInCents || 0) - (intent()!.netAmountInCents || 0) - (intent()!.platformFeeInCents || 0)) / 100 | money:intent()!.currency }}</dd>
+                  <dt>Tarifa de la plataforma</dt><dd>{{ (intent()!.platformFeeInCents || 0) / 100 | money:intent()!.currency }}</dd>
+                </div>
+              }
               @if (intent()!.status === 'PENDING') {
                 <p class="muted" style="margin-top:16px;font-size:12.5px">La pasarela aún no ha confirmado la transacción. Puedes actualizar el estado en unos segundos.</p>
                 <button type="button" class="btn btn-secondary" style="margin-top:12px" (click)="load()">Actualizar estado</button>

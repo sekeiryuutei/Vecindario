@@ -123,6 +123,12 @@ app:
     integrity-secret: ${WOMPI_INTEGRITY_SECRET:test_integrity_secret}
     api-url: ${WOMPI_API_URL:https://sandbox.wompi.co/v1}
     redirect-url: ${WOMPI_REDIRECT_URL:}
+  fees:
+    enabled: ${PLATFORM_FEE_ENABLED:true}
+    platform-fee: ${PLATFORM_FEE_AMOUNT:2000}
+    wompi-rate: ${WOMPI_COMMISSION_RATE:0.0265}
+    wompi-fixed: ${WOMPI_COMMISSION_FIXED:700}
+    wompi-iva-rate: ${WOMPI_COMMISSION_IVA_RATE:0.19}
   storage:
     local-dir: ${STORAGE_LOCAL_DIR:/tmp/vecindad-storage}
   maintenance:
