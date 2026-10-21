@@ -22,6 +22,9 @@ public record CommonArea(
         int minAdvanceHours,
         int maxAdvanceDays,
         int cancellationDeadlineHours,
+        String terms,
+        LocalTime approvalStartTime,
+        LocalTime approvalEndTime,
         boolean isActive,
         Instant createdAt,
         Instant updatedAt
@@ -30,7 +33,7 @@ public record CommonArea(
         return new CommonArea(newId, name, description, capacity, requiresPayment, pricePerSlot, depositAmount,
                 requiresApproval, openingTime, closingTime, slotDurationMinutes, maxSlotsPerReservation,
                 maxActiveReservationsPerUnit, minAdvanceHours, maxAdvanceDays, cancellationDeadlineHours,
-                isActive, createdAt, updatedAt);
+                terms, approvalStartTime, approvalEndTime, isActive, createdAt, updatedAt);
     }
 }
 

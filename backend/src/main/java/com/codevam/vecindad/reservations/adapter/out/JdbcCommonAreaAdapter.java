@@ -19,7 +19,7 @@ public class JdbcCommonAreaAdapter implements CommonAreaPort {
             id, name, description, capacity, requires_payment, price_per_slot, deposit_amount,
             requires_approval, opening_time, closing_time, slot_duration_minutes, max_slots_per_reservation,
             max_active_reservations_per_unit, min_advance_hours, max_advance_days, cancellation_deadline_hours,
-            is_active, created_at, updated_at
+            terms, approval_start_time, approval_end_time, is_active, created_at, updated_at
             """;
 
     private static final RowMapper<CommonArea> MAPPER = (rs, rowNum) -> new CommonArea(
@@ -39,10 +39,17 @@ public class JdbcCommonAreaAdapter implements CommonAreaPort {
             rs.getInt("min_advance_hours"),
             rs.getInt("max_advance_days"),
             rs.getInt("cancellation_deadline_hours"),
+            rs.getString("terms"),
+            localTime(rs.getTime("approval_start_time")),
+            localTime(rs.getTime("approval_end_time")),
             rs.getBoolean("is_active"),
             Jdbc.instant(rs, "created_at"),
             Jdbc.instant(rs, "updated_at")
     );
+
+    private static java.time.LocalTime localTime(Time time) {
+        return time == null ? null : time.toLocalTime();
+    }
 
     private final TenantJdbc t;
 
@@ -58,15 +65,19 @@ public class JdbcCommonAreaAdapter implements CommonAreaPort {
                     id, name, description, capacity, requires_payment, price_per_slot, deposit_amount,
                     requires_approval, opening_time, closing_time, slot_duration_minutes, max_slots_per_reservation,
                     max_active_reservations_per_unit, min_advance_hours, max_advance_days, cancellation_deadline_hours,
-                    is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    terms, approval_start_time, approval_end_time, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         t.jdbc().update(t.q(sql),
                 id, a.name(), a.description(), a.capacity(), a.requiresPayment(),
                 a.pricePerSlot(), a.depositAmount(), a.requiresApproval(),
                 Time.valueOf(a.openingTime()), Time.valueOf(a.closingTime()),
                 a.slotDurationMinutes(), a.maxSlotsPerReservation(), a.maxActiveReservationsPerUnit(),
-                a.minAdvanceHours(), a.maxAdvanceDays(), a.cancellationDeadlineHours(), a.isActive());
+                a.minAdvanceHours(), a.maxAdvanceDays(), a.cancellationDeadlineHours(),
+                a.terms() == null ? "" : a.terms(),
+                a.approvalStartTime() == null ? null : Time.valueOf(a.approvalStartTime()),
+                a.approvalEndTime() == null ? null : Time.valueOf(a.approvalEndTime()),
+                a.isActive());
         return findById(id).orElseThrow();
     }
 
@@ -95,7 +106,8 @@ public class JdbcCommonAreaAdapter implements CommonAreaPort {
                     name = ?, description = ?, capacity = ?, requires_payment = ?, price_per_slot = ?,
                     deposit_amount = ?, requires_approval = ?, opening_time = ?, closing_time = ?,
                     slot_duration_minutes = ?, max_slots_per_reservation = ?, max_active_reservations_per_unit = ?,
-                    min_advance_hours = ?, max_advance_days = ?, cancellation_deadline_hours = ?, is_active = ?,
+                    min_advance_hours = ?, max_advance_days = ?, cancellation_deadline_hours = ?,
+                    terms = ?, approval_start_time = ?, approval_end_time = ?, is_active = ?,
                     updated_at = now()
                 WHERE id = ?
                 """;
@@ -104,8 +116,11 @@ public class JdbcCommonAreaAdapter implements CommonAreaPort {
                 a.pricePerSlot(), a.depositAmount(), a.requiresApproval(),
                 Time.valueOf(a.openingTime()), Time.valueOf(a.closingTime()),
                 a.slotDurationMinutes(), a.maxSlotsPerReservation(), a.maxActiveReservationsPerUnit(),
-                a.minAdvanceHours(), a.maxAdvanceDays(), a.cancellationDeadlineHours(), a.isActive(),
-                a.id()) > 0;
+                a.minAdvanceHours(), a.maxAdvanceDays(), a.cancellationDeadlineHours(),
+                a.terms() == null ? "" : a.terms(),
+                a.approvalStartTime() == null ? null : Time.valueOf(a.approvalStartTime()),
+                a.approvalEndTime() == null ? null : Time.valueOf(a.approvalEndTime()),
+                a.isActive(), a.id()) > 0;
     }
 
     @Override

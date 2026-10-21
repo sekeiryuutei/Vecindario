@@ -30,6 +30,7 @@ const LABELS: Record<string, string> = {
   INSIDE: 'Dentro',
   OUTSIDE: 'Fuera',
   PENDING: 'Pendiente',
+  PENDING_PAYMENT: 'Pendiente de pago',
   PENDING_APPROVAL: 'Pendiente de aprobación',
   PENDING_AUTH: 'Pendiente de autorización',
   APPROVED: 'Aprobado',

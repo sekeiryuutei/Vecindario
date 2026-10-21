@@ -28,8 +28,16 @@ public class ReservationService {
             Instant endTime,
             PaymentMethod paymentMethod,
             String paymentReference,
-            String notes
-    ) {}
+            String notes,
+            boolean acceptedTerms
+    ) {
+        public CreateReservationCommand(UUID commonAreaId, UUID unitId, UUID personId,
+                                        Instant startTime, Instant endTime, PaymentMethod paymentMethod,
+                                        String paymentReference, String notes) {
+            this(commonAreaId, unitId, personId, startTime, endTime, paymentMethod,
+                    paymentReference, notes, true);
+        }
+    }
 
     private final CommonAreaPort commonAreaPort;
     private final ReservationPort reservationPort;
@@ -61,6 +69,10 @@ public class ReservationService {
                 .orElseThrow(() -> ApiException.notFound("Zona común no encontrada."));
         if (!area.isActive()) {
             throw ApiException.conflict("COMMON_AREA_INACTIVE", "La zona común se encuentra inactiva o en mantenimiento.");
+        }
+        if (area.terms() != null && !area.terms().isBlank() && !cmd.acceptedTerms()) {
+            throw ApiException.badRequest("TERMS_NOT_ACCEPTED",
+                    "Debes aceptar los términos y condiciones de la zona común para continuar.");
         }
 
         // 1. Bloqueo por mora según billing_settings
@@ -124,9 +136,11 @@ public class ReservationService {
             totalPrice = area.pricePerSlot().multiply(BigDecimal.valueOf(slots)).setScale(2, RoundingMode.HALF_UP);
         }
 
-        ReservationStatus initialStatus = area.requiresApproval()
-                ? ReservationStatus.PENDING_APPROVAL
-                : ReservationStatus.APPROVED;
+        boolean needsApproval = requiresApproval(area, cmd.startTime(), cmd.endTime());
+        boolean needsPayment = area.requiresPayment() && totalPrice.signum() > 0;
+        ReservationStatus initialStatus = needsPayment
+                ? ReservationStatus.PENDING_PAYMENT
+                : needsApproval ? ReservationStatus.PENDING_APPROVAL : ReservationStatus.APPROVED;
 
         Reservation reservation = new Reservation(
                 UUID.randomUUID(),
@@ -149,6 +163,39 @@ public class ReservationService {
         );
 
         return reservationPort.insert(reservation);
+    }
+
+    /**
+     * Confirma el pago de una reserva. Si el horario cae en la ventana de
+     * aprobación configurada, pasa a revisión de administración; de lo
+     * contrario queda aprobada automáticamente.
+     */
+    @Transactional
+    public boolean markPaid(UUID reservationId, String paymentReference) {
+        Reservation r = getById(reservationId);
+        if (r.status() != ReservationStatus.PENDING_PAYMENT) {
+            return false;
+        }
+        CommonArea area = commonAreaPort.findById(r.commonAreaId())
+                .orElseThrow(() -> ApiException.notFound("Zona comǧn no encontrada."));
+        ReservationStatus next = requiresApproval(area, r.startTime(), r.endTime())
+                ? ReservationStatus.PENDING_APPROVAL
+                : ReservationStatus.APPROVED;
+        return reservationPort.markPaid(reservationId, next, paymentReference);
+    }
+
+    private boolean requiresApproval(CommonArea area, Instant start, Instant end) {
+        if (area.requiresApproval()) {
+            return true;
+        }
+        if (area.approvalStartTime() == null) {
+            return false;
+        }
+        LocalTime windowStart = area.approvalStartTime();
+        LocalTime windowEnd = area.approvalEndTime() != null ? area.approvalEndTime() : area.closingTime();
+        LocalTime localStart = start.atZone(BOGOTA).toLocalTime();
+        LocalTime localEnd = end.atZone(BOGOTA).toLocalTime();
+        return localStart.isBefore(windowEnd) && localEnd.isAfter(windowStart);
     }
 
     @Transactional
@@ -174,7 +221,9 @@ public class ReservationService {
     @Transactional
     public Reservation cancelReservation(UUID reservationId, String reason, boolean isAdmin) {
         Reservation r = getById(reservationId);
-        if (r.status() != ReservationStatus.APPROVED && r.status() != ReservationStatus.PENDING_APPROVAL) {
+        if (r.status() != ReservationStatus.APPROVED
+                && r.status() != ReservationStatus.PENDING_APPROVAL
+                && r.status() != ReservationStatus.PENDING_PAYMENT) {
             throw ApiException.conflict("RESERVATION_CANNOT_BE_CANCELLED", "La reserva ya se encuentra " + r.status());
         }
 

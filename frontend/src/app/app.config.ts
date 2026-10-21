@@ -1,3 +1,5 @@
+import { registerLocaleData } from '@angular/common';
+import localeEsCo from '@angular/common/locales/es-CO';
 import { ApplicationConfig, LOCALE_ID, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
@@ -8,6 +10,8 @@ import { BrandingService } from './core/branding.service';
 import { RuntimeConfigService } from './core/runtime-config.service';
 import { authInterceptor, errorInterceptor, refreshInterceptor } from './core/interceptors';
 import { environment } from '../environments/environment';
+
+registerLocaleData(localeEsCo, 'es-CO');
 
 export const appConfig: ApplicationConfig = {
   providers: [

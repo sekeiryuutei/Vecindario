@@ -53,7 +53,8 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 | **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **118 unitarias + 51 IT, smoke integral OK** |
 | **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build`, Playwright 5/5 y Docker build multi-stage OK** |
 | **Autogestión y nómina** | Edición de datos de la copropiedad y activación de canales autogestionables (`WHATSAPP`, `CAMERAS`, `LPR`, `ASSEMBLIES`); pagos en línea sigue siendo una decisión de plataforma. Nómina por copropiedad con parámetros, empleados, periodos, cálculo de aportes/provisiones, pago, anulación y exportación CSV. | **Completada** | **Pruebas unitarias, smoke y flujo API/UI verificados** |
-| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 5/5; cobertura 53,57% de líneas** |
+| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 7/7; cobertura 53,46% de líneas** |
+| **Reservas, pagos e integraciones** | Términos de uso y ventanas de aprobación por zona común, reservas con pago previo (`PENDING_PAYMENT`) facturadas con Wompi, panel general multi-copropiedad (`/my/tenant-overview`) y credenciales de Wompi/IA cifradas (AES-GCM) y administradas por copropiedad desde el área de plataforma. | **Completada** | **143 unitarias + 51 IT, smoke de 23 secciones OK, E2E 7/7** |
 
 ---
 
@@ -72,6 +73,9 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `PUT /tenants/current/features/{feature}`: Activación de `WHATSAPP`, `CAMERAS`, `LPR` y `ASSEMBLIES`; `ONLINE_PAYMENTS` se administra desde plataforma.
 - `GET /audit`: Registro inmutable de auditoría del tenant.
 - `GET/POST /platform/companies`, `GET/POST /platform/tenants`: Gestión de nivel Super Admin.
+- `GET /my/tenant-overview`: Resumen de todas las copropiedades asignadas (rol, permisos y métricas) para el panel general.
+- `GET/PUT/DELETE /platform/tenants/{tenantId}/integrations[/wompi|/ai]`: Credenciales de Wompi y del proveedor de IA por
+  copropiedad, cifradas con AES-GCM; la API solo devuelve el estado enmascarado.
 
 ### Inmuebles, Personas y Vehículos (Fases 1 y 2a)
 - `GET/POST /properties`, `GET/PUT/DELETE /properties/{id}`
@@ -167,7 +171,7 @@ docker logs vecindad_backend --tail 50
 # 4. Ejecutar pruebas unitarias, integración y cobertura
 cd backend
 mvn -B verify
-# Resultado esperado: 118 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
+# Resultado esperado: 143 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
 cd ..
 
 # 5. Compilar el frontend y ejecutar Playwright
@@ -182,7 +186,7 @@ cd ..
 
 # 6. Smoke test integral (23 secciones)
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
-# Resultado esperado: build sin errores, Playwright 5/5 y mensaje final "TODO OK"
+# Resultado esperado: build sin errores, Playwright 7/7 y mensaje final "TODO OK"
 ```
 
 ### 4.2 Credenciales de Demostración
@@ -264,10 +268,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 ## 7. Estado de entrega y pendientes externos
 
-**Verificado en el entorno local:** arranque Docker, migraciones, 118 unitarias, 51 IT, cobertura 53,57% de líneas,
-Playwright 5/5, smoke de 23 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
+**Verificado en el entorno local:** arranque Docker, migraciones, 143 unitarias, 51 IT, cobertura 53,46% de líneas,
+Playwright 7/7, smoke de 23 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
 webhook de WhatsApp firmado/idempotente, envío y recepción real de WhatsApp, pago Wompi aprobado en sandbox con webhook
-reconciliado y configuración productiva fail-closed.
+reconciliado, reservas con términos y aprobación previa, panel general multi-copropiedad, integraciones por copropiedad
+cifradas y configuración productiva fail-closed.
 
 **Pendiente para producción (requiere decisiones o credenciales del propietario):**
 
@@ -275,6 +280,8 @@ reconciliado y configuración productiva fail-closed.
 - Secretos productivos: JWT, PostgreSQL, Redis, SMTP, Wompi y WhatsApp. El `WOMPI_INTEGRITY_SECRET` debe ser el secreto
   de integridad del panel, **distinto** del secreto de eventos. En sandbox ya se completó un pago real con tarjeta de
   prueba y el webhook reconcilió la intención; en producción faltan las llaves y secretos productivos.
+- `INTEGRATIONS_ENCRYPTION_KEY` (32+ bytes) para cifrar las credenciales de Wompi y de IA que defina cada copropiedad; sin
+  esta variable el backend no arranca en producción.
 - Wompi de producción con llaves y secretos productivos; el checkout de desarrollo debe dejar `WOMPI_REDIRECT_URL` vacío
   porque Wompi rechaza redirects HTTP/localhost. En producción el redirect y el webhook deben ser HTTPS públicos.
 - WhatsApp: número de negocio real, token rotado, app de Meta dedicada, plantillas aprobadas y webhook público. El envío

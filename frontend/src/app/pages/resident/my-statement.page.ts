@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService, saveBlob } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { MoneyPipe } from '../../core/format.pipes';
+import { TenantContextService } from '../../core/tenant-context.service';
 import { label, statusTone } from '../../core/labels';
 import { IntentResponse, MyUnit, Statement } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
@@ -75,7 +76,9 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
         <div class="card">
           <div class="card-header"><div><h2>Pago en línea</h2><p>Abona a las obligaciones del inmueble con la pasarela habilitada.</p></div></div>
           <div class="card-body">
-            @if (!auth.hasPermission('PAYMENTS_ONLINE_CREATE')) {
+            @if (!onlinePaymentsEnabled()) {
+              <div class="notice">Los pagos en línea no están habilitados para esta copropiedad. Puedes pagar directamente en la administración.</div>
+            } @else if (!auth.hasPermission('PAYMENTS_ONLINE_CREATE', 'PAYMENTS_CREATE')) {
               <div class="notice">Tu rol no tiene habilitado el pago en línea. Puedes realizar el pago directamente en la administración.</div>
             } @else if ((data.closingBalance ?? 0) <= 0) {
               <div class="notice">No tienes saldo pendiente. Si realizas un abono, quedará como saldo a favor.</div>
@@ -139,6 +142,7 @@ import { EmptyStateComponent, PageHeaderComponent } from '../../shared/ui.compon
 })
 export class MyStatementPage {
   readonly auth = inject(AuthService);
+  readonly tenantContext = inject(TenantContextService);
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   readonly label = label;
@@ -158,6 +162,11 @@ export class MyStatementPage {
 
   constructor() {
     void this.loadUnits();
+  }
+
+  onlinePaymentsEnabled(): boolean {
+    const features = this.tenantContext.tenant()?.features;
+    return !features || features['ONLINE_PAYMENTS'] !== false;
   }
 
   async loadUnits(): Promise<void> {
@@ -225,9 +234,18 @@ export class MyStatementPage {
       if (result.reference) sessionStorage.setItem('vecindad.wompi.reference', result.reference);
       window.location.assign(result.checkoutUrl);
     } catch (error) {
-      this.paymentError.set(describeError(error));
+      this.paymentError.set(this.paymentErrorMessage(error));
     } finally {
       this.paying.set(false);
     }
+  }
+
+  /** Distingue la función deshabilitada de un problema de permisos del rol. */
+  private paymentErrorMessage(error: unknown): string {
+    const candidate = error as { error?: { code?: string; message?: string } };
+    if (candidate?.error?.code === 'ONLINE_PAYMENTS_DISABLED') {
+      return 'Los pagos en línea no están habilitados para esta copropiedad. Puedes pagar directamente en la administración.';
+    }
+    return describeError(error);
   }
 }

@@ -45,7 +45,8 @@ class ReservationServiceTest {
         area = new CommonArea(
                 areaId, "Salón Social", "Salón de eventos", 50,
                 true, new BigDecimal("50000.00"), new BigDecimal("100000.00"), true,
-                LocalTime.of(8, 0), LocalTime.of(22, 0), 60, 4, 2, 12, 30, 24, true,
+                LocalTime.of(8, 0), LocalTime.of(22, 0), 60, 4, 2, 12, 30, 24,
+                "Términos de prueba", null, null, true,
                 Instant.now(), Instant.now()
         );
 
@@ -104,7 +105,7 @@ class ReservationServiceTest {
 
         Reservation created = service.createReservation(userId, cmd);
         assertNotNull(created);
-        assertEquals(ReservationStatus.PENDING_APPROVAL, created.status());
+        assertEquals(ReservationStatus.PENDING_PAYMENT, created.status());
         assertEquals(new BigDecimal("100000.00"), created.totalPrice()); // 2 slots * 50.000
     }
 }

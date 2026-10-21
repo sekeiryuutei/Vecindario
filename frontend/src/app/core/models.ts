@@ -274,6 +274,9 @@ export interface CommonAreaRequest {
   minAdvanceHours?: number;
   maxAdvanceDays?: number;
   cancellationDeadlineHours?: number;
+  terms?: string;
+  approvalStartTime?: LocalTime;
+  approvalEndTime?: LocalTime;
 }
 
 export interface LocalTime {
@@ -300,6 +303,9 @@ export interface CommonArea {
   minAdvanceHours?: number;
   maxAdvanceDays?: number;
   cancellationDeadlineHours?: number;
+  terms?: string;
+  approvalStartTime?: LocalTime;
+  approvalEndTime?: LocalTime;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -481,7 +487,7 @@ export interface Reservation {
   createdBy?: string;
   startTime?: string;
   endTime?: string;
-  status?: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "CANCELLED" | "COMPLETED";
+  status?: "PENDING_PAYMENT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "CANCELLED" | "COMPLETED";
   totalPrice?: number;
   depositAmount?: number;
   paymentMethod?: "NONE" | "CASH" | "WOMPI" | "BANK_TRANSFER";
@@ -731,6 +737,7 @@ export interface CreateMyReservationRequest {
   paymentMethod?: "NONE" | "CASH" | "WOMPI" | "BANK_TRANSFER";
   paymentReference?: string;
   notes?: string;
+  acceptedTerms?: boolean;
 }
 
 export interface CancelMyReservationRequest {
@@ -1120,6 +1127,45 @@ export interface TenantSummary {
   name?: string;
   slug?: string;
   role?: string;
+}
+
+export interface TenantOverviewMetrics {
+  units?: number;
+  people?: number;
+  openPqrs?: number;
+  openIncidents?: number;
+  upcomingReservations?: number;
+  pendingPackages?: number;
+  overdueCharges?: number;
+  overdueAmount?: number;
+}
+
+export interface TenantOverview {
+  id?: string;
+  name?: string;
+  slug?: string;
+  role?: string;
+  canManage?: boolean;
+  metrics?: TenantOverviewMetrics | null;
+}
+
+export interface WompiIntegrationView {
+  configured?: boolean;
+  inherited?: boolean;
+  publicKey?: string;
+  apiUrl?: string;
+}
+
+export interface AiIntegrationView {
+  configured?: boolean;
+  inherited?: boolean;
+  provider?: string;
+  model?: string;
+}
+
+export interface TenantIntegrations {
+  wompi?: WompiIntegrationView;
+  ai?: AiIntegrationView;
 }
 
 export interface UserView {

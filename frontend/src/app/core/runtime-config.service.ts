@@ -17,9 +17,13 @@ export class RuntimeConfigService {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 5000);
     try {
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (window.location.hostname.endsWith('.ngrok-free.app') || window.location.hostname.endsWith('.ngrok-free.dev')) {
+        headers['ngrok-skip-browser-warning'] = 'true';
+      }
       const response = await fetch('runtime-config.json', {
         cache: 'no-store',
-        headers: { Accept: 'application/json' },
+        headers,
         signal: controller.signal
       });
       if (!response.ok) return;

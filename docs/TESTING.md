@@ -163,6 +163,7 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 | Certificados | `/app/residente/certificados` | Solicitar/descargar certificado y verificar su código |
 | Visitas | `/app/residente/visitas` | Crear invitación con QR y autorizar una visita pendiente |
 | Reservas | `/app/residente/reservas` | Reservar una zona común y cancelar si aplica |
+| Selección de copropiedad | `/seleccionar-copropiedad` | Revisar el panel general con las métricas de todas las copropiedades asignadas y elegir una |
 | PQRS | `/app/residente/pqrs` | Crear PQRS y seguir la respuesta |
 | Comunicados | `/app/residente/comunicados` | Leer y marcar comunicados |
 | Asambleas | `/app/residente/asambleas` | Registrar asistencia y votar |
@@ -175,8 +176,26 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 |---|---|---|
 | Dashboard | `/app/plataforma` | Ver métricas globales |
 | Empresas | `/app/plataforma/empresas` | Crear/editar empresa |
-| Copropiedades | `/app/plataforma/copropiedades` | Crear/editar copropiedad y sus feature flags |
+| Copropiedades | `/app/plataforma/copropiedades` | Crear/editar copropiedad, sus feature flags y las integraciones (Wompi/IA) por copropiedad |
 | Auditoría global | `/app/plataforma/auditoria` | Ver eventos de plataforma |
+
+### Integraciones por copropiedad
+
+1. Entrar como `superadmin@vecindad.local`, abrir **Copropiedades → Gestionar** y verificar que la sección
+   *Integraciones de la copropiedad* indica que Wompi y la IA usan la configuración global.
+2. Guardar unas credenciales de Wompi de prueba (`pub_…`, `prv_…`, secretos de 16 caracteres o más y distintos entre
+   sí). El panel debe mostrar la copropiedad como configurada y los campos de secretos deben quedar vacíos.
+3. Comprobar en la base de datos que la fila de `public.tenant_integrations` no contiene el texto plano de las llaves.
+4. Crear una reserva con pago en Demo Norte y verificar que la URL de checkout usa la llave pública de esa copropiedad.
+5. Pulsar *Volver a la configuración global* y verificar que la copropiedad vuelve a heredar los valores del entorno.
+6. Repetir el guardado con dos secretos iguales y confirmar que la API responde `REUSED_WOMPI_SECRET`.
+
+### Pagos en línea por copropiedad
+
+- Demo Norte tiene `ONLINE_PAYMENTS=true`: el propietario ve el botón de pago y obtiene una URL de checkout de Wompi.
+- Demo Sur tiene `ONLINE_PAYMENTS=false`: el propietario ve el aviso de que los pagos en línea no están habilitados y la
+  API responde `403 ONLINE_PAYMENTS_DISABLED` (no es un problema de permisos del rol).
+
 
 ### Flujo integrado de 10 minutos
 

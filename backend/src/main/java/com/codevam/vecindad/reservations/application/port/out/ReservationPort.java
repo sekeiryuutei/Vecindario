@@ -19,6 +19,7 @@ public interface ReservationPort {
     PageResult<Reservation> search(UUID commonAreaId, UUID unitId, ReservationStatus status,
                                    Instant from, Instant to, int page, int size);
     boolean updateStatus(UUID id, ReservationStatus status, String rejectionReason, String cancellationReason);
+    boolean markPaid(UUID id, ReservationStatus status, String paymentReference);
     boolean isUnitBlockedByDebt(UUID unitId);
 }
 

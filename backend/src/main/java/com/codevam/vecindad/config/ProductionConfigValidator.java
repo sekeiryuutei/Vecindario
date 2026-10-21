@@ -47,7 +47,10 @@ public class ProductionConfigValidator implements InitializingBean {
         require(errors, isHttps(publicUrl), "APP_PUBLIC_URL debe ser una URL HTTPS pública (no localhost).");
         String redirect = props.wompi() == null ? null : props.wompi().redirectUrl();
         if (props.wompi() != null && props.wompi().enabled()) {
-            require(errors, isHttps(redirect), "WOMPI_REDIRECT_URL debe ser una URL HTTPS pública.");
+            String effectiveRedirect = StringUtils.hasText(redirect) ? redirect.trim()
+                    : (StringUtils.hasText(publicUrl) ? publicUrl.replaceAll("/+$", "") + "/pagos/wompi/resultado" : null);
+            require(errors, isHttps(effectiveRedirect),
+                    "WOMPI_REDIRECT_URL (o APP_PUBLIC_URL para derivarla) debe ser una URL HTTPS pública.");
         }
 
         if (props.seed() == null || props.seed().enabled()) {
@@ -68,6 +71,9 @@ public class ProductionConfigValidator implements InitializingBean {
         }
 
         String jwtSecret = props.jwt() == null ? null : props.jwt().secret();
+        String integrationsKey = env.getProperty("app.integrations.encryption-key");
+        require(errors, integrationsKey != null && integrationsKey.getBytes(StandardCharsets.UTF_8).length >= 32,
+                "INTEGRATIONS_ENCRYPTION_KEY debe tener al menos 32 bytes en produccion.");
         require(errors, jwtSecret != null && jwtSecret.getBytes(StandardCharsets.UTF_8).length >= 48,
                 "JWT_SECRET debe tener al menos 48 bytes en producción.");
         require(errors, jwtSecret != null && !jwtSecret.startsWith("dev-only"),

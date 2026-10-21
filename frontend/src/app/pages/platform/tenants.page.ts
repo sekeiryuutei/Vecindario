@@ -9,6 +9,7 @@ import {
   CreateTenantRequest,
   MemberView,
   PageResultTenantView,
+  TenantIntegrations,
   TenantView
 } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
@@ -25,6 +26,19 @@ interface TenantForm {
   department: string;
   phone: string;
   email: string;
+}
+
+interface WompiIntegrationForm {
+  publicKey: string;
+  privateKey: string;
+  integritySecret: string;
+  eventsSecret: string;
+}
+
+interface AiIntegrationForm {
+  provider: string;
+  apiKey: string;
+  model: string;
 }
 
 @Component({
@@ -160,6 +174,58 @@ interface TenantForm {
             <p class="muted small" style="margin-top:8px">El usuario recibirá una invitación o se vinculará a su cuenta existente según su correo.</p>
           </div>
         </div>
+        <div class="divider"></div>
+        <h3 class="section-title">Integraciones de la copropiedad</h3>
+        <p class="muted small" style="margin-bottom:12px">Las credenciales se cifran antes de guardarse y nunca se devuelven al navegador. Si dejas un secreto vacío, se conserva el valor actual.</p>
+        @if (integrationsError()) { <div class="alert alert-error" style="margin-bottom:12px">{{ integrationsError() }}</div> }
+        @if (integrationsLoading()) {
+          <p class="muted small"><span class="spinner"></span> Consultando integraciones...</p>
+        } @else if (integrations(); as cfg) {
+          <div class="grid grid-2">
+            <div>
+              <h4 style="margin:0 0 8px">Wompi</h4>
+              <p class="muted small" style="margin-bottom:10px">
+                {{ cfg.wompi?.inherited ? 'Usando la configuración global de la plataforma.' : 'Configuración propia de esta copropiedad.' }}
+              </p>
+              <div class="form-grid">
+                <div class="field span-2"><label for="wompiPublicKey">Llave pública</label><input id="wompiPublicKey" name="wompiPublicKey" class="input" maxlength="200" [(ngModel)]="wompiForm.publicKey" placeholder="pub_prod_..."></div>
+                <div class="field"><label for="wompiPrivateKey">Llave privada</label><input id="wompiPrivateKey" name="wompiPrivateKey" class="input" type="password" autocomplete="new-password" maxlength="200" [(ngModel)]="wompiForm.privateKey" placeholder="Dejar vacío para conservar"></div>
+                <div class="field"><label for="wompiIntegrity">Secreto de integridad</label><input id="wompiIntegrity" name="wompiIntegrity" class="input" type="password" autocomplete="new-password" maxlength="300" [(ngModel)]="wompiForm.integritySecret" placeholder="Dejar vacío para conservar"></div>
+                <div class="field span-2"><label for="wompiEvents">Secreto de eventos</label><input id="wompiEvents" name="wompiEvents" class="input" type="password" autocomplete="new-password" maxlength="300" [(ngModel)]="wompiForm.eventsSecret" placeholder="Debe ser distinto al de integridad"></div>
+              </div>
+              <div class="row" style="margin-top:10px">
+                <button type="button" class="btn btn-primary btn-sm" [disabled]="integrationSaving() === 'WOMPI'" (click)="saveWompi()">{{ integrationSaving() === 'WOMPI' ? 'Guardando…' : 'Guardar Wompi' }}</button>
+                @if (!cfg.wompi?.inherited) {
+                  <button type="button" class="btn btn-ghost btn-sm" [disabled]="integrationSaving() === 'WOMPI'" (click)="resetIntegration('WOMPI')">Volver a la configuración global</button>
+                }
+              </div>
+            </div>
+            <div>
+              <h4 style="margin:0 0 8px">Inteligencia artificial</h4>
+              <p class="muted small" style="margin-bottom:10px">
+                {{ cfg.ai?.inherited ? 'Usando la configuración global de la plataforma.' : 'Credenciales propias de esta copropiedad.' }}
+              </p>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="aiProvider">Proveedor</label>
+                  <select id="aiProvider" name="aiProvider" class="select" [(ngModel)]="aiForm.provider">
+                    <option value="gemini">Gemini</option>
+                    <option value="openai">OpenAI compatible</option>
+                    <option value="local">Respuestas locales</option>
+                  </select>
+                </div>
+                <div class="field"><label for="aiModel">Modelo</label><input id="aiModel" name="aiModel" class="input" maxlength="120" [(ngModel)]="aiForm.model" placeholder="gemini-3.7-flash"></div>
+                <div class="field span-2"><label for="aiKey">Clave del proveedor</label><input id="aiKey" name="aiKey" class="input" type="password" autocomplete="new-password" maxlength="500" [(ngModel)]="aiForm.apiKey" placeholder="Dejar vacío para conservar"></div>
+              </div>
+              <div class="row" style="margin-top:10px">
+                <button type="button" class="btn btn-primary btn-sm" [disabled]="integrationSaving() === 'AI'" (click)="saveAi()">{{ integrationSaving() === 'AI' ? 'Guardando…' : 'Guardar IA' }}</button>
+                @if (!cfg.ai?.inherited) {
+                  <button type="button" class="btn btn-ghost btn-sm" [disabled]="integrationSaving() === 'AI'" (click)="resetIntegration('AI')">Volver a la configuración global</button>
+                }
+              </div>
+            </div>
+          </div>
+        }
       }
     </app-modal>
   `
@@ -184,6 +250,10 @@ export class TenantsPage {
   readonly memberError = signal('');
   readonly memberSaving = signal(false);
   readonly featureSaving = signal('');
+  readonly integrations = signal<TenantIntegrations | null>(null);
+  readonly integrationsLoading = signal(false);
+  readonly integrationsError = signal('');
+  readonly integrationSaving = signal('');
   readonly page = signal(0);
   readonly totalPages = signal(0);
   readonly totalElements = signal(0);
@@ -194,6 +264,8 @@ export class TenantsPage {
   statusValue = 'ACTIVE';
   form: TenantForm = this.emptyForm();
   memberForm: AddMemberRequest = { email: '', fullName: '', role: 'ADMINISTRADOR' };
+  wompiForm: WompiIntegrationForm = { publicKey: '', privateKey: '', integritySecret: '', eventsSecret: '' };
+  aiForm: AiIntegrationForm = { provider: 'gemini', apiKey: '', model: '' };
 
   constructor() {
     void this.loadCompanies();
@@ -282,7 +354,95 @@ export class TenantsPage {
     this.memberForm = { email: '', fullName: '', role: 'ADMINISTRADOR' };
     this.memberError.set('');
     this.lastMember.set(null);
+    this.integrations.set(null);
+    this.integrationsError.set('');
+    this.wompiForm = { publicKey: '', privateKey: '', integritySecret: '', eventsSecret: '' };
+    this.aiForm = { provider: 'gemini', apiKey: '', model: '' };
     this.manageOpen.set(true);
+    if (tenant.id) void this.loadIntegrations(tenant.id);
+  }
+
+  async loadIntegrations(tenantId: string): Promise<void> {
+    this.integrationsLoading.set(true);
+    this.integrationsError.set('');
+    try {
+      const view = await firstValueFrom(this.api.get<TenantIntegrations>(`/platform/tenants/${tenantId}/integrations`));
+      this.integrations.set(view);
+      this.wompiForm = {
+        publicKey: view.wompi?.publicKey ?? '',
+        privateKey: '',
+        integritySecret: '',
+        eventsSecret: ''
+      };
+      this.aiForm = {
+        provider: view.ai?.provider ?? 'gemini',
+        apiKey: '',
+        model: view.ai?.model ?? ''
+      };
+    } catch (error) {
+      this.integrationsError.set(describeError(error));
+    } finally {
+      this.integrationsLoading.set(false);
+    }
+  }
+
+  async saveWompi(): Promise<void> {
+    const tenant = this.selected();
+    if (!tenant?.id) return;
+    this.integrationSaving.set('WOMPI');
+    this.integrationsError.set('');
+    try {
+      this.integrations.set(await firstValueFrom(this.api.put<TenantIntegrations>(
+        `/platform/tenants/${tenant.id}/integrations/wompi`, this.wompiForm)));
+      this.wompiForm = {
+        publicKey: this.integrations()?.wompi?.publicKey ?? '',
+        privateKey: '',
+        integritySecret: '',
+        eventsSecret: ''
+      };
+      this.toast.success('Credenciales de Wompi actualizadas.');
+    } catch (error) {
+      this.integrationsError.set(describeError(error));
+    } finally {
+      this.integrationSaving.set('');
+    }
+  }
+
+  async saveAi(): Promise<void> {
+    const tenant = this.selected();
+    if (!tenant?.id) return;
+    this.integrationSaving.set('AI');
+    this.integrationsError.set('');
+    try {
+      this.integrations.set(await firstValueFrom(this.api.put<TenantIntegrations>(
+        `/platform/tenants/${tenant.id}/integrations/ai`, this.aiForm)));
+      this.aiForm = {
+        provider: this.integrations()?.ai?.provider ?? this.aiForm.provider,
+        apiKey: '',
+        model: this.integrations()?.ai?.model ?? ''
+      };
+      this.toast.success('Configuración de IA actualizada.');
+    } catch (error) {
+      this.integrationsError.set(describeError(error));
+    } finally {
+      this.integrationSaving.set('');
+    }
+  }
+
+  async resetIntegration(provider: string): Promise<void> {
+    const tenant = this.selected();
+    if (!tenant?.id) return;
+    this.integrationSaving.set(provider);
+    this.integrationsError.set('');
+    try {
+      await firstValueFrom(this.api.delete<void>(`/platform/tenants/${tenant.id}/integrations/${provider}`));
+      await this.loadIntegrations(tenant.id);
+      this.toast.success('La copropiedad volvió a la configuración global.');
+    } catch (error) {
+      this.integrationsError.set(describeError(error));
+    } finally {
+      this.integrationSaving.set('');
+    }
   }
 
   async changeStatus(): Promise<void> {

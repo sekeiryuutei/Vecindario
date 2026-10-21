@@ -5,8 +5,12 @@ import com.codevam.vecindad.billing.application.PaymentService;
 import com.codevam.vecindad.billing.domain.Money;
 import com.codevam.vecindad.billing.domain.PaymentMethod;
 import com.codevam.vecindad.config.AppProperties;
+import com.codevam.vecindad.integrations.TenantIntegrationService;
 import com.codevam.vecindad.people.application.port.out.UnitRelationPort;
 import com.codevam.vecindad.properties.application.port.out.PropertyUnitPort;
+import com.codevam.vecindad.reservations.application.ReservationService;
+import com.codevam.vecindad.reservations.domain.Reservation;
+import com.codevam.vecindad.reservations.domain.ReservationStatus;
 import com.codevam.vecindad.shared.error.ApiException;
 import com.codevam.vecindad.shared.security.AuthenticatedUser;
 import com.codevam.vecindad.shared.security.CurrentUser;
@@ -55,27 +59,32 @@ public class WompiService {
     private final PropertyUnitPort units;
     private final UnitRelationPort relations;
     private final PaymentService payments;
+    private final ReservationService reservations;
     private final AuditService audit;
     private final AppProperties props;
+    private final TenantIntegrationService integrations;
     private final Clock clock;
 
     public WompiService(OnlinePaymentPort onlinePayments, TenantPort tenants, PropertyUnitPort units,
-                        UnitRelationPort relations, PaymentService payments, AuditService audit,
-                        AppProperties props, Clock clock) {
+                        UnitRelationPort relations, PaymentService payments, ReservationService reservations,
+                        AuditService audit, AppProperties props, TenantIntegrationService integrations, Clock clock) {
         this.onlinePayments = onlinePayments;
         this.tenants = tenants;
         this.units = units;
         this.relations = relations;
         this.payments = payments;
+        this.reservations = reservations;
         this.audit = audit;
         this.props = props;
+        this.integrations = integrations;
         this.clock = clock;
     }
 
     public IntentResponse createIntent(UUID unitId, BigDecimal amount, String notes) {
         AuthenticatedUser me = CurrentUser.requireTenant();
         UUID tenantId = me.tenantId();
-        requireConfigured();
+        TenantIntegrationService.WompiConfig wompi = integrations.wompi(tenantId);
+        requireConfigured(wompi);
 
         Map<String, Boolean> features = tenants.features(tenantId);
         if (!Boolean.TRUE.equals(features.get("ONLINE_PAYMENTS"))) {
@@ -101,10 +110,10 @@ public class WompiService {
         String prefix = slug.substring(0, Math.min(6, slug.length())).toUpperCase();
         String reference = "WP-" + prefix + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
 
-        String signature = sha256(reference + amountInCents + "COP" + props.wompi().integritySecret());
+        String signature = sha256(reference + amountInCents + "COP" + wompi.integritySecret());
 
         OnlinePaymentIntent intent = new OnlinePaymentIntent(
-                UUID.randomUUID(), reference, tenantId, unitId, me.userId(),
+                UUID.randomUUID(), reference, tenantId, unitId, null, me.userId(),
                 amountInCents, "COP", signature, OnlinePaymentIntent.IntentStatus.PENDING,
                 null, null, null, null, null, Instant.now(), Instant.now()
         );
@@ -113,9 +122,9 @@ public class WompiService {
         audit.log(tenantId, "ONLINE_PAYMENT_INTENT_CREATED", "ONLINE_PAYMENT", reference, true,
                 Map.of("unitId", unitId.toString(), "amount", validatedAmount.toString()));
 
-        String redirectUrl = props.wompi().redirectUrl() == null ? "" : props.wompi().redirectUrl().trim();
+        String redirectUrl = redirectUrl();
         UriComponentsBuilder checkout = UriComponentsBuilder.fromHttpUrl(CHECKOUT_URL)
-                .queryParam("public-key", props.wompi().publicKey())
+                .queryParam("public-key", wompi.publicKey())
                 .queryParam("currency", "COP")
                 .queryParam("amount-in-cents", amountInCents)
                 .queryParam("reference", reference)
@@ -124,7 +133,66 @@ public class WompiService {
             checkout.queryParam("redirect-url", redirectUrl);
         }
 
-        return new IntentResponse(reference, amountInCents, "COP", signature, props.wompi().publicKey(),
+        return new IntentResponse(reference, amountInCents, "COP", signature, wompi.publicKey(),
+                checkout.build().encode().toUriString(), redirectUrl, "PENDING");
+    }
+
+    /**
+     * Crea el checkout de una reserva que quedó en PENDING_PAYMENT. El pago se
+     * registra en cartera y la reserva se libera para aprobación cuando Wompi
+     * confirma la transacción.
+     */
+    public IntentResponse createReservationIntent(UUID reservationId) {
+        AuthenticatedUser me = CurrentUser.requireTenant();
+        Reservation reservation = reservations.getById(reservationId);
+        if (!relations.userHasUnit(me.userId(), reservation.unitId()) && !me.hasPermission("PAYMENTS_CREATE")) {
+            throw ApiException.notFound("Reserva no encontrada.");
+        }
+        if (reservation.status() != ReservationStatus.PENDING_PAYMENT) {
+            throw ApiException.conflict("RESERVATION_NOT_PENDING_PAYMENT",
+                    "La reserva no está pendiente de pago.");
+        }
+        UUID tenantId = me.tenantId();
+        TenantIntegrationService.WompiConfig wompi = integrations.wompi(tenantId);
+        requireConfigured(wompi);
+        Map<String, Boolean> features = tenants.features(tenantId);
+        if (!Boolean.TRUE.equals(features.get("ONLINE_PAYMENTS"))) {
+            throw ApiException.forbidden("ONLINE_PAYMENTS_DISABLED",
+                    "Los pagos en línea no están habilitados para esta copropiedad.");
+        }
+
+        BigDecimal amount = reservation.totalPrice();
+        if (amount == null || amount.compareTo(MINIMUM_ONLINE_AMOUNT) < 0) {
+            throw ApiException.badRequest("AMOUNT_TOO_LOW",
+                    "El valor mínimo del pago en línea es de $1.500 COP.");
+        }
+        long amountInCents = amount.multiply(BigDecimal.valueOf(100)).longValueExact();
+
+        Tenant tenant = tenants.findById(tenantId).orElseThrow();
+        String prefix = tenant.slug().substring(0, Math.min(6, tenant.slug().length())).toUpperCase();
+        String reference = "RSV-" + prefix + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
+        String signature = sha256(reference + amountInCents + "COP" + wompi.integritySecret());
+
+        OnlinePaymentIntent intent = new OnlinePaymentIntent(
+                UUID.randomUUID(), reference, tenantId, reservation.unitId(), reservationId, me.userId(),
+                amountInCents, "COP", signature, OnlinePaymentIntent.IntentStatus.PENDING,
+                null, null, null, null, null, Instant.now(), Instant.now()
+        );
+        onlinePayments.insert(intent);
+        audit.log(tenantId, "RESERVATION_PAYMENT_INTENT_CREATED", "ONLINE_PAYMENT", reference, true,
+                Map.of("reservationId", reservationId.toString(), "amount", amount.toString()));
+
+        String redirectUrl = redirectUrl();
+        UriComponentsBuilder checkout = UriComponentsBuilder.fromHttpUrl(CHECKOUT_URL)
+                .queryParam("public-key", wompi.publicKey())
+                .queryParam("currency", "COP")
+                .queryParam("amount-in-cents", amountInCents)
+                .queryParam("reference", reference)
+                .queryParam("signature:integrity", signature);
+        if (!redirectUrl.isBlank()) {
+            checkout.queryParam("redirect-url", redirectUrl);
+        }
+        return new IntentResponse(reference, amountInCents, "COP", signature, wompi.publicKey(),
                 checkout.build().encode().toUriString(), redirectUrl, "PENDING");
     }
 
@@ -150,13 +218,6 @@ public class WompiService {
             return;
         }
 
-        verifySignature(event);
-
-        if (props.isProduction() && event.environment() != null && !event.environment().isBlank()
-                && !"prod".equalsIgnoreCase(event.environment())) {
-            throw ApiException.badRequest("INVALID_ENVIRONMENT", "El evento no proviene del entorno productivo de Wompi.");
-        }
-
         Optional<OnlinePaymentIntent> opt = onlinePayments.findByReference(tx.reference());
         if (opt.isEmpty()) {
             log.warn("Evento Wompi recibido para referencia desconocida: {}", tx.reference());
@@ -164,6 +225,14 @@ public class WompiService {
         }
 
         OnlinePaymentIntent intent = opt.get();
+        TenantIntegrationService.WompiConfig wompi = integrations.wompi(intent.tenantId());
+        verifySignature(event, wompi.eventsSecret());
+
+        if (props.isProduction() && event.environment() != null && !event.environment().isBlank()
+                && !"prod".equalsIgnoreCase(event.environment())) {
+            throw ApiException.badRequest("INVALID_ENVIRONMENT", "El evento no proviene del entorno productivo de Wompi.");
+        }
+
         if (intent.status() == OnlinePaymentIntent.IntentStatus.APPROVED) {
             log.info("Evento Wompi duplicado/ya procesado para referencia: {}", tx.reference());
             return;
@@ -188,6 +257,11 @@ public class WompiService {
                         intent.unitId(), amount, Money.today(clock), PaymentMethod.WOMPI, "WOMPI",
                         tx.reference(), "Pago Wompi", "Aprobado por Wompi transacción " + tx.id()
                 ), "wompi-" + tx.id());
+                if (current.reservationId() != null
+                        && !reservations.markPaid(current.reservationId(), tx.reference())) {
+                    log.warn("Pago Wompi aprobado pero la reserva {} ya no estaba pendiente de pago.",
+                            current.reservationId());
+                }
                 Long fee = tx.fee() != null ? tx.fee().amountInCents() : null;
                 onlinePayments.updateStatus(tx.reference(), OnlinePaymentIntent.IntentStatus.APPROVED,
                         tx.id(), tx.paymentMethodType(), fee, registered.payment().id(), null);
@@ -232,20 +306,35 @@ public class WompiService {
         return found;
     }
 
-    private void requireConfigured() {
-        AppProperties.Wompi w = props.wompi();
-        if (w == null || !w.enabled()) {
+    /**
+     * Usa WOMPI_REDIRECT_URL si está definido; en caso contrario deriva la
+     * página de resultado desde APP_PUBLIC_URL para no duplicar la URL pública
+     * en cada entorno o túnel.
+     */
+    private String redirectUrl() {
+        String configured = props.wompi() == null ? null : props.wompi().redirectUrl();
+        if (configured != null && !configured.isBlank()) {
+            return configured.trim();
+        }
+        String publicUrl = props.publicUrl();
+        if (publicUrl == null || publicUrl.isBlank()) {
+            return "";
+        }
+        return publicUrl.replaceAll("/+$", "") + "/pagos/wompi/resultado";
+    }
+
+    private void requireConfigured(TenantIntegrationService.WompiConfig wompi) {
+        if (wompi == null || !wompi.enabled()) {
             throw ApiException.badRequest("ONLINE_PAYMENTS_DISABLED", "Los pagos en línea están deshabilitados.");
         }
-        if (blank(w.publicKey()) || blank(w.privateKey()) || blank(w.integritySecret())) {
+        if (blank(wompi.publicKey()) || blank(wompi.privateKey()) || blank(wompi.integritySecret())) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "ONLINE_PAYMENTS_NOT_CONFIGURED",
                     "La pasarela de pagos no está configurada. Contacta a la administración.");
         }
     }
 
-    private void verifySignature(WompiEvent event) {
-        AppProperties.Wompi w = props.wompi();
-        boolean secretConfigured = w != null && !blank(w.eventsSecret());
+    private void verifySignature(WompiEvent event, String eventsSecret) {
+        boolean secretConfigured = !blank(eventsSecret);
         WompiEvent.WompiSignature signature = event.signature();
 
         if (!secretConfigured) {
@@ -278,7 +367,7 @@ public class WompiService {
             }
             raw.append(value);
         }
-        raw.append(event.timestamp()).append(w.eventsSecret());
+        raw.append(event.timestamp()).append(eventsSecret);
 
         String expected = sha256(raw.toString());
         byte[] expectedBytes = expected.getBytes(StandardCharsets.US_ASCII);

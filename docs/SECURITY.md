@@ -39,6 +39,18 @@
 - **Documentos**: almacenamiento local persistente con permisos por rol y descarga autenticada; en producción
   `STORAGE_LOCAL_DIR` debe ser absoluto y fuera de `/tmp`.
 
+## Credenciales por copropiedad
+
+Las llaves de Wompi y las claves del proveedor de IA pueden definirse por copropiedad desde el área de plataforma. Se
+guardan cifradas con AES-GCM en `public.tenant_integrations`, con la llave maestra fuera de la base de datos
+(`INTEGRATIONS_ENCRYPTION_KEY`, mínimo 32 bytes, obligatorio en producción). El cifrado autentica el contenido: una
+alteración manual en la tabla se detecta al descifrar y la API reporta un error en lugar de usar una credencial corrupta.
+
+La API nunca devuelve llaves privadas ni secretos: el panel solo muestra el estado (configurada o heredada) y la llave
+pública de Wompi, que es pública por diseño porque viaja en la URL de checkout. La rotación conserva los secretos que no
+se reenvían y el borrado de la configuración propia devuelve la copropiedad a los valores globales del entorno.
+Cambiar `INTEGRATIONS_ENCRYPTION_KEY` exige volver a cargar todas las credenciales por copropiedad.
+
 ## Infraestructura y cabeceras
 
 - Nginx aplica CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`,

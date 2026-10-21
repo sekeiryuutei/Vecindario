@@ -84,19 +84,25 @@ public class DemoDataPhase4Runner implements ApplicationRunner {
         CommonArea salon = commonAreaService.create(new CommonArea(
                 null, "Salón Comunal", "Salón social para eventos y reuniones familiares", 50,
                 true, new BigDecimal("50000.00"), new BigDecimal("100000.00"), true,
-                LocalTime.of(8, 0), LocalTime.of(23, 0), 60, 5, 2, 12, 30, 24, true, null, null
+                LocalTime.of(8, 0), LocalTime.of(23, 0), 60, 5, 2, 12, 30, 24,
+                "El salón se entrega barrido y con el mobiliario inventariado. El residente responde por daños y debe dejar el espacio en las mismas condiciones. No se permite música por encima de los decibeles permitidos ni el ingreso de personas ajenas a la copropiedad sin registro.",
+                null, null, true, null, null
         ));
 
         CommonArea bbq = commonAreaService.create(new CommonArea(
                 null, "Zona BBQ", "Quiosco con asador y mobiliario rústico", 20,
                 true, new BigDecimal("30000.00"), new BigDecimal("50000.00"), false,
-                LocalTime.of(10, 0), LocalTime.of(20, 0), 60, 4, 2, 6, 20, 12, true, null, null
+                LocalTime.of(10, 0), LocalTime.of(20, 0), 60, 4, 2, 6, 20, 12,
+                "La zona BBQ debe quedar limpia, con la parrilla apagada y los residuos en los recipientes dispuestos para ello. El uso después de las 18:00 requiere aprobación de la administración para controlar el ruido.",
+                LocalTime.of(18, 0), LocalTime.of(20, 0), true, null, null
         ));
 
         CommonArea cancha = commonAreaService.create(new CommonArea(
                 null, "Cancha Múltiple", "Cancha deportiva para microfútbol y baloncesto", 15,
                 false, BigDecimal.ZERO, BigDecimal.ZERO, false,
-                LocalTime.of(6, 0), LocalTime.of(21, 0), 60, 2, 2, 2, 7, 6, true, null, null
+                LocalTime.of(6, 0), LocalTime.of(21, 0), 60, 2, 2, 2, 7, 6,
+                "La cancha se usa con calzado deportivo y sin ingreso de alimentos o bebidas alcohólicas. El uso entre las 18:00 y las 21:00 requiere autorización de la administración por tratarse de horario nocturno; no genera cobro.",
+                LocalTime.of(18, 0), LocalTime.of(21, 0), true, null, null
         ));
 
         // 2. PQRS y Convivencia

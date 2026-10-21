@@ -8,6 +8,7 @@ public record OnlinePaymentIntent(
         String reference,
         UUID tenantId,
         UUID unitId,
+        UUID reservationId,
         UUID userId,
         long amountInCents,
         String currency,

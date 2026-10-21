@@ -10,11 +10,21 @@ function isAuthEndpoint(url: string): boolean {
   return /\/(auth\/login|auth\/refresh|auth\/forgot-password|auth\/reset-password|public\/)/.test(url);
 }
 
+function isNgrokHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  return host.endsWith('.ngrok-free.app') || host.endsWith('.ngrok-free.dev') || host.endsWith('.ngrok.io');
+}
+
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const auth = inject(AuthService);
   const token = auth.accessToken();
-  if (!token || isAuthEndpoint(request.url)) return next(request);
-  return next(request.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
+  const headers: Record<string, string> = {};
+  // ngrok free muestra una página intersticial a las peticiones de navegador.
+  // Este encabezado la evita en las llamadas a la API sin afectar al backend.
+  if (isNgrokHost()) headers['ngrok-skip-browser-warning'] = 'true';
+  if (token && !isAuthEndpoint(request.url)) headers.Authorization = `Bearer ${token}`;
+  return Object.keys(headers).length ? next(request.clone({ setHeaders: headers })) : next(request);
 };
 
 export const refreshInterceptor: HttpInterceptorFn = (request, next) => {

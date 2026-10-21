@@ -37,6 +37,9 @@ interface AreaForm {
   minAdvanceHours: number;
   maxAdvanceDays: number;
   cancellationDeadlineHours: number;
+  terms: string;
+  approvalStart: string;
+  approvalEnd: string;
 }
 
 @Component({
@@ -109,7 +112,7 @@ interface AreaForm {
                           <button type="button" class="btn btn-primary btn-sm" (click)="approve(item)">Aprobar</button>
                           <button type="button" class="btn btn-secondary btn-sm" (click)="openDecision(item, 'reject')">Rechazar</button>
                         }
-                        @if ((item.status === 'PENDING_APPROVAL' || item.status === 'APPROVED') && auth.hasPermission('RESERVATIONS_APPROVE')) {
+                        @if ((item.status === 'PENDING_APPROVAL' || item.status === 'APPROVED' || item.status === 'PENDING_PAYMENT') && auth.hasPermission('RESERVATIONS_APPROVE')) {
                           <button type="button" class="btn btn-ghost btn-sm" (click)="openDecision(item, 'cancel')">Cancelar</button>
                         }
                         @if (item.rejectionReason) { <span class="muted small" [title]="item.rejectionReason">Ver motivo</span> }
@@ -174,6 +177,10 @@ interface AreaForm {
           <div class="field"><label class="check"><input type="checkbox" [(ngModel)]="areaForm.requiresPayment"> Cobrar por uso</label></div>
           <div class="field"><label for="price">Valor por franja</label><input id="price" name="price" type="number" min="0" step="0.01" class="input" [(ngModel)]="areaForm.pricePerSlot" [disabled]="!areaForm.requiresPayment"></div>
           <div class="field"><label for="deposit">Depósito</label><input id="deposit" name="deposit" type="number" min="0" step="0.01" class="input" [(ngModel)]="areaForm.depositAmount"></div>
+          <div class="field span-2"><label for="areaTerms">Términos y condiciones de uso</label><textarea id="areaTerms" name="areaTerms" class="textarea" maxlength="4000" [(ngModel)]="areaForm.terms" placeholder="Reglas de uso, cuidados, responsabilidades y consecuencias. El residente deberá aceptarlas antes de reservar."></textarea></div>
+          <div class="field"><label for="approvalStart">Aprobación obligatoria desde</label><input id="approvalStart" name="approvalStart" type="time" class="input" [(ngModel)]="areaForm.approvalStart"></div>
+          <div class="field"><label for="approvalEnd">Aprobación obligatoria hasta</label><input id="approvalEnd" name="approvalEnd" type="time" class="input" [(ngModel)]="areaForm.approvalEnd"></div>
+          <div class="field span-2"><p class="muted small">Opcional. Si defines una ventana, solo las reservas que se crucen con ese horario quedarán pendientes de aprobación; el resto se aprueba automáticamente. Úsalo, por ejemplo, para la piscina o la cancha en la noche.</p></div>
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" (click)="areaOpen.set(false)">Cancelar</button>
@@ -198,7 +205,7 @@ export class ReservationsPage {
   private readonly toast = inject(ToastService);
   readonly label = label;
   readonly tone = statusTone;
-  readonly statuses = ['PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'];
+  readonly statuses = ['PENDING_PAYMENT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'];
   readonly tab = signal<ReservationsTab>('reservations');
   readonly reservations = signal<Reservation[]>([]);
   readonly areas = signal<CommonArea[]>([]);
@@ -311,7 +318,10 @@ export class ReservationsPage {
       maxActiveReservationsPerUnit: area.maxActiveReservationsPerUnit ?? 2,
       minAdvanceHours: area.minAdvanceHours ?? 0,
       maxAdvanceDays: area.maxAdvanceDays ?? 30,
-      cancellationDeadlineHours: area.cancellationDeadlineHours ?? 24
+      cancellationDeadlineHours: area.cancellationDeadlineHours ?? 24,
+      terms: area.terms ?? '',
+      approvalStart: timeString(area.approvalStartTime) || '',
+      approvalEnd: timeString(area.approvalEndTime) || ''
     } : this.emptyArea();
     this.areaOpen.set(true);
   }
@@ -324,6 +334,11 @@ export class ReservationsPage {
     }
     if (this.areaForm.opening >= this.areaForm.closing) {
       this.error.set('La hora de apertura debe ser anterior a la de cierre.');
+      return;
+    }
+    if (this.areaForm.approvalStart && this.areaForm.approvalEnd
+        && this.areaForm.approvalStart >= this.areaForm.approvalEnd) {
+      this.error.set('El inicio de la ventana de aprobación debe ser anterior a su fin.');
       return;
     }
     const body: CommonAreaRequest = {
@@ -341,7 +356,10 @@ export class ReservationsPage {
       maxActiveReservationsPerUnit: Number(this.areaForm.maxActiveReservationsPerUnit),
       minAdvanceHours: Number(this.areaForm.minAdvanceHours),
       maxAdvanceDays: Number(this.areaForm.maxAdvanceDays),
-      cancellationDeadlineHours: Number(this.areaForm.cancellationDeadlineHours)
+      cancellationDeadlineHours: Number(this.areaForm.cancellationDeadlineHours),
+      terms: this.areaForm.terms.trim() || undefined,
+      approvalStartTime: this.areaForm.approvalStart ? toLocalTime(this.areaForm.approvalStart) : undefined,
+      approvalEndTime: this.areaForm.approvalEnd ? toLocalTime(this.areaForm.approvalEnd) : undefined
     };
     this.saving.set(true);
     try {
@@ -421,7 +439,10 @@ export class ReservationsPage {
       maxActiveReservationsPerUnit: 2,
       minAdvanceHours: 2,
       maxAdvanceDays: 30,
-      cancellationDeadlineHours: 24
+      cancellationDeadlineHours: 24,
+      terms: '',
+      approvalStart: '',
+      approvalEnd: ''
     };
   }
 

@@ -271,6 +271,7 @@ $res1 = Call POST '/my/reservations' $ot @{
   startTime = $resStart
   endTime = $resEnd
   paymentMethod = 'NONE'
+  acceptedTerms = $true
   notes = 'Partido de microfútbol'
 }
 Check 'reserva creada exitosamente (201, APPROVED)' ($res1.Status -eq 201 -and $res1.Json.status -eq 'APPROVED')
@@ -282,6 +283,7 @@ $resDup = Call POST '/my/reservations' $ot @{
   startTime = $resStart
   endTime = $resEnd
   paymentMethod = 'NONE'
+  acceptedTerms = $true
   notes = 'Reserva duplicada'
 }
 Check 'traslape de horario rechazado (409 SLOT_ALREADY_RESERVED)' ($resDup.Status -eq 409 -and $resDup.Json.code -eq 'SLOT_ALREADY_RESERVED')
@@ -294,6 +296,7 @@ if ($unit201) {
     startTime = (Get-Date).AddDays($rndDays + 1).Date.AddHours(10).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     endTime = (Get-Date).AddDays($rndDays + 1).Date.AddHours(11).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     paymentMethod = 'NONE'
+    acceptedTerms = $true
   }
   Check 'bloqueo de reservas por mora (409 RESERVATIONS_BLOCKED_BY_DEBT)' ($resDebt.Status -eq 409 -and $resDebt.Json.code -eq 'RESERVATIONS_BLOCKED_BY_DEBT')
 }

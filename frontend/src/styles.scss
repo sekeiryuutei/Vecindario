@@ -50,7 +50,7 @@ p { margin: 0; }
 img { max-width: 100%; }
 
 /* Application shell */
-.app-shell { display: flex; min-height: 100vh; background: var(--canvas); }
+.app-shell { display: flex; height: 100vh; overflow: hidden; background: var(--canvas); }
 .sidebar {
   width: 258px; flex: 0 0 258px; background: var(--sidebar); color: var(--sidebar-text);
   display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; z-index: 40;
@@ -84,7 +84,7 @@ img { max-width: 100%; }
 .user-meta { min-width: 0; flex: 1; }
 .user-name { color: #f1f5f9; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-role { color: #94a3b8; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.shell-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.shell-main { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
 .topbar {
   height: 62px; background: rgba(255,255,255,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
   display: flex; align-items: center; gap: 14px; padding: 0 22px; position: sticky; top: 0; z-index: 30;
@@ -246,7 +246,7 @@ img { max-width: 100%; }
 
 /* Modal */
 .modal-backdrop {
-  position: fixed; inset: 0; background: rgba(15, 23, 42, .5); z-index: 1000; display: flex;
+  position: fixed; inset: 0; background: rgba(15, 23, 42, .5); z-index: 10050; display: flex;
   align-items: flex-start; justify-content: center; padding: 5vh 16px 32px; overflow-y: auto;
   animation: fadeIn .15s ease;
 }
@@ -334,6 +334,10 @@ img { max-width: 100%; }
 .login-tenant:hover { border-color: var(--brand); background: #f0fdfa; }
 .login-tenant strong { display: block; font-size: 13.5px; color: var(--ink); }
 .login-tenant span { font-size: 11.5px; color: var(--muted); }
+.login-tenant .overview-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px 10px; margin-top: 9px; width: 100%; }
+.login-tenant .overview-stats > span { display: block; font-size: 10.5px; color: var(--muted); line-height: 1.25; }
+.login-tenant .overview-stats b { display: block; font-size: 12.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.login-tenant .overview-stats .overdue b { color: var(--danger); }
 .detail-list { display: grid; grid-template-columns: 180px 1fr; gap: 10px 16px; font-size: 13px; }
 .detail-list dt { color: var(--muted); }
 .detail-list dd { margin: 0; color: var(--ink); font-weight: 550; }
@@ -381,10 +385,11 @@ img { max-width: 100%; }
   .modal { border-radius: 16px 16px 0 0; max-height: 94vh; overflow-y: auto; }
   .modal-footer { border-radius: 0; }
   .table th, .table td { padding: 10px 11px; }
+  .login-tenant .overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media print {
   .sidebar, .topbar, .page-actions, .filter-bar, .pagination, .btn { display: none !important; }
-  .app-shell, .content { display: block; padding: 0; }
+  .app-shell, .shell-main, .content { display: block; height: auto; overflow: visible; padding: 0; }
   .card { box-shadow: none; border-color: #cbd5e1; }
   .print-only { display: block; }
 }

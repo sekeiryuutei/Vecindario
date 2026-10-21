@@ -32,6 +32,7 @@ El volumen `vecindad_storage` conserva documentos y certificados. Los volúmenes
    # Si compilas la app Capacitor, añade los orígenes exactos:
    # CORS_ALLOWED_ORIGINS=https://app.ejemplo.com,https://localhost,capacitor://localhost
    JWT_SECRET=<48+ bytes aleatorios, p. ej. openssl rand -base64 64>
+   INTEGRATIONS_ENCRYPTION_KEY=<32+ bytes, p. ej. openssl rand -hex 48>
    DATABASE_PASSWORD=<16+ caracteres aleatorios>
    REDIS_PASSWORD=<16+ caracteres aleatorios>
    SMTP_HOST=smtp.proveedor.com

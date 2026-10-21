@@ -6,6 +6,7 @@ import com.codevam.vecindad.people.domain.Person;
 import com.codevam.vecindad.reservations.application.ReservationService;
 import com.codevam.vecindad.reservations.domain.PaymentMethod;
 import com.codevam.vecindad.reservations.domain.Reservation;
+import com.codevam.vecindad.wompi.application.WompiService;
 import com.codevam.vecindad.shared.error.ApiException;
 import com.codevam.vecindad.shared.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,7 +34,8 @@ public class MyReservationController {
             @NotNull Instant endTime,
             PaymentMethod paymentMethod,
             @Size(max = 100) String paymentReference,
-            @Size(max = 500) String notes
+            @Size(max = 500) String notes,
+            boolean acceptedTerms
     ) {}
 
     public record CancelMyReservationRequest(@Size(max = 500) String reason) {}
@@ -41,11 +43,14 @@ public class MyReservationController {
     private final ReservationService service;
     private final PersonPort personPort;
     private final UnitRelationPort relationPort;
+    private final WompiService wompi;
 
-    public MyReservationController(ReservationService service, PersonPort personPort, UnitRelationPort relationPort) {
+    public MyReservationController(ReservationService service, PersonPort personPort, UnitRelationPort relationPort,
+                                   WompiService wompi) {
         this.service = service;
         this.personPort = personPort;
         this.relationPort = relationPort;
+        this.wompi = wompi;
     }
 
     @Operation(summary = "Lista reservas de un inmueble propio")
@@ -65,8 +70,17 @@ public class MyReservationController {
         UUID userId = CurrentUser.requireTenant().userId();
         return service.createReservation(userId, new ReservationService.CreateReservationCommand(
                 r.commonAreaId(), r.unitId(), personId, r.startTime(), r.endTime(),
-                r.paymentMethod(), r.paymentReference(), r.notes()
+                r.paymentMethod(), r.paymentReference(), r.notes(), r.acceptedTerms()
         ));
+    }
+
+    @Operation(summary = "Genera el enlace de pago Wompi de una reserva pendiente")
+    @PostMapping("/{id}/checkout")
+    @PreAuthorize("hasAuthority('RESERVATIONS_MANAGE_OWN')")
+    public WompiService.IntentResponse checkout(@PathVariable UUID id) {
+        Reservation reservation = service.getById(id);
+        ensureUnitAccess(reservation.unitId());
+        return wompi.createReservationIntent(id);
     }
 
     @Operation(summary = "Cancela una reserva de un inmueble propio")

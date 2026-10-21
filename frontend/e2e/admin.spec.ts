@@ -1,7 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { loginTenant } from './helpers';
+import { login, loginTenant } from './helpers';
 
 test.describe('Administración de copropiedad', () => {
+  test('el panel general resume todas las copropiedades asignadas', async ({ page }) => {
+    await login(page, 'admin@vecindad.local');
+    await page.goto('/seleccionar-copropiedad');
+
+    await expect(page.getByRole('heading', { name: /Panel general/i })).toBeVisible();
+    await expect(page.getByText(/inmuebles/i).first()).toBeVisible();
+    await expect(page.getByText(/personas/i).first()).toBeVisible();
+    await expect(page.getByText(/en mora/i).first()).toBeVisible();
+  });
+
   test('el administrador entra a la copropiedad y consulta la nómina', async ({ page }) => {
     await loginTenant(page, 'admin@vecindad.local', 'Demo Norte');
 

@@ -140,7 +140,8 @@ class ProductionConfigValidatorTest {
                 .withProperty("springdoc.api-docs.enabled", "false")
                 .withProperty("spring.datasource.password", "DatabaseSecret-2026!")
                 .withProperty("spring.data.redis.password", "RedisSecret-2026!")
-                .withProperty("spring.mail.host", "smtp.example.com");
+                .withProperty("spring.mail.host", "smtp.example.com")
+                .withProperty("app.integrations.encryption-key", JWT_SECRET);
     }
 
     private static AppProperties productionProps() {

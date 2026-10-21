@@ -21,6 +21,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -65,16 +67,40 @@ public class SecurityConfig {
 
     @Bean("corsConfigurationSource")
     public CorsConfigurationSource corsConfigurationSource(AppProperties props) {
-        List<String> origins = props.security().corsAllowedOrigins() == null ? List.of()
-                : props.security().corsAllowedOrigins().stream().filter(s -> s != null && !s.isBlank()).toList();
+        List<String> origins = new ArrayList<>(props.security().corsAllowedOrigins() == null ? List.of()
+                : props.security().corsAllowedOrigins().stream().filter(s -> s != null && !s.isBlank()).toList());
+        String publicOrigin = originOf(props.publicUrl());
+        if (publicOrigin != null && !origins.contains(publicOrigin)) {
+            origins.add(publicOrigin);
+        }
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowedOrigins(origins);
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        c.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Trace-Id", "Idempotency-Key"));
+        c.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Trace-Id", "Idempotency-Key",
+                "ngrok-skip-browser-warning"));
         c.setExposedHeaders(List.of("X-Trace-Id"));
         c.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", c);
         return source;
+    }
+
+    /**
+     * Deriva el origen exacto de APP_PUBLIC_URL para que el túnel o dominio
+     * público solo tenga que configurarse una vez. Ignora rutas y parámetros.
+     */
+    private String originOf(String publicUrl) {
+        if (publicUrl == null || publicUrl.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(publicUrl.trim());
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return null;
+            }
+            return uri.getScheme() + "://" + uri.getHost() + (uri.getPort() > 0 ? ":" + uri.getPort() : "");
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }

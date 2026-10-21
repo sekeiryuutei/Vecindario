@@ -1,6 +1,7 @@
 package com.codevam.vecindad.ai;
 
 import com.codevam.vecindad.config.AiProperties;
+import com.codevam.vecindad.integrations.TenantIntegrationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,9 +10,7 @@ import org.springframework.context.annotation.Configuration;
 public class AiConfig {
 
     @Bean
-    public AiGateway aiGateway(AiProperties props, ObjectMapper mapper) {
-        return new RoutingAiGateway(props,
-                new GeminiAiProvider(props, mapper),
-                new OpenAiCompatibleProvider(props, mapper));
+    public AiGateway aiGateway(AiProperties props, TenantIntegrationService integrations, ObjectMapper mapper) {
+        return new TenantAiGateway(props, integrations, mapper);
     }
 }

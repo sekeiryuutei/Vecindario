@@ -11,6 +11,7 @@ import {
   CancelMyReservationRequest,
   CommonArea,
   CreateMyReservationRequest,
+  IntentResponse,
   MyUnit,
   Reservation,
   TimeSlot
@@ -74,7 +75,10 @@ import { EmptyStateComponent, ModalComponent, PageHeaderComponent } from '../../
                   </td>
                   <td>
                     <div class="table-actions">
-                      @if ((item.status === 'PENDING_APPROVAL' || item.status === 'APPROVED') && auth.hasPermission('RESERVATIONS_MANAGE_OWN')) {
+                      @if ((item.status === 'PENDING_APPROVAL' || item.status === 'APPROVED' || item.status === 'PENDING_PAYMENT') && auth.hasPermission('RESERVATIONS_MANAGE_OWN')) {
+                        @if (item.status === 'PENDING_PAYMENT') {
+                          <button type="button" class="btn btn-primary btn-sm" [disabled]="saving()" (click)="pay(item)">Pagar</button>
+                        }
                         <button type="button" class="btn btn-ghost btn-sm" (click)="openCancel(item)">Cancelar</button>
                       }
                     </div>
@@ -123,6 +127,13 @@ import { EmptyStateComponent, ModalComponent, PageHeaderComponent } from '../../
           @if (area.requiresApproval) { La reserva queda pendiente de aprobación. }
           Selecciona hasta {{ area.maxSlotsPerReservation }} franja(s) continua(s).
         </div>
+        @if (area.terms) {
+          <div class="notice" style="margin-top:12px">
+            <strong>Términos y condiciones de uso</strong>
+            <div class="small" style="white-space:pre-line;margin-top:6px">{{ area.terms }}</div>
+            <label class="check" style="margin-top:12px"><input type="checkbox" name="termsAccepted" [(ngModel)]="termsAccepted"> Acepto los términos y condiciones de esta zona</label>
+          </div>
+        }
       }
 
       <div class="divider"></div>
@@ -162,7 +173,7 @@ import { EmptyStateComponent, ModalComponent, PageHeaderComponent } from '../../
 
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" (click)="createOpen.set(false)">Cancelar</button>
-        <button type="button" class="btn btn-primary" [disabled]="saving() || !selectedSlots().length" (click)="create()">{{ saving() ? 'Reservando…' : 'Confirmar reserva' }}</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving() || !selectedSlots().length || (!!selectedArea()?.terms && !termsAccepted)" (click)="create()">{{ saving() ? 'Reservando…' : 'Confirmar reserva' }}</button>
       </div>
     </app-modal>
 
@@ -215,7 +226,7 @@ export class MyReservationsPage {
     return Number(area.pricePerSlot ?? 0) * this.selectedSlots().length;
   });
   readonly activeReservations = computed(() =>
-    this.reservations().filter((item) => item.status === 'APPROVED' || item.status === 'PENDING_APPROVAL').length
+    this.reservations().filter((item) => item.status === 'APPROVED' || item.status === 'PENDING_APPROVAL' || item.status === 'PENDING_PAYMENT').length
   );
   readonly upcomingReservations = computed(() => {
     const now = Date.now();
@@ -226,6 +237,7 @@ export class MyReservationsPage {
   });
   unitFilter = '';
   date = addDays(1);
+  termsAccepted = false;
   cancelReason = '';
   form: CreateMyReservationRequest = this.emptyForm();
   private selection: number[] = [];
@@ -290,6 +302,7 @@ export class MyReservationsPage {
     this.date = addDays(1);
     this.selection = [];
     this.slots.set([]);
+    this.termsAccepted = false;
     this.formError.set('');
     this.createOpen.set(true);
     if (this.form.commonAreaId) await this.loadAvailability();
@@ -298,6 +311,7 @@ export class MyReservationsPage {
   async loadAvailability(): Promise<void> {
     this.selection = [];
     this.slots.set([]);
+    this.termsAccepted = false;
     if (!this.form.commonAreaId || !this.date) return;
     this.loadingAvailability.set(true);
     this.formError.set('');
@@ -358,17 +372,47 @@ export class MyReservationsPage {
       startTime: start,
       endTime: end,
       paymentMethod: 'NONE',
-      notes: this.form.notes?.trim() || undefined
+      notes: this.form.notes?.trim() || undefined,
+      acceptedTerms: this.termsAccepted
     };
+    const area = this.selectedArea();
+    if (area?.terms && !this.termsAccepted) {
+      this.formError.set('Debes aceptar los términos y condiciones de la zona para continuar.');
+      return;
+    }
     this.saving.set(true);
     try {
-      await firstValueFrom(this.api.post<Reservation>('/my/reservations', body));
-      this.toast.success('Reserva registrada.');
+      const reservation = await firstValueFrom(this.api.post<Reservation>('/my/reservations', body));
       this.createOpen.set(false);
       this.unitFilter = body.unitId;
       await this.loadReservations();
+      if (reservation.status === 'PENDING_PAYMENT') {
+        this.toast.success('Reserva registrada. Completa el pago para confirmarla.');
+        await this.pay(reservation);
+      } else if (reservation.status === 'PENDING_APPROVAL') {
+        this.toast.success('Reserva registrada. Queda pendiente de aprobación de la administración.');
+      } else {
+        this.toast.success('Reserva confirmada.');
+      }
     } catch (error) {
       this.formError.set(describeError(error));
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async pay(item: Reservation): Promise<void> {
+    if (!item.id) return;
+    this.saving.set(true);
+    try {
+      const intent = await firstValueFrom(this.api.post<IntentResponse>(`/my/reservations/${item.id}/checkout`, {}));
+      if (intent.checkoutUrl) {
+        window.location.assign(intent.checkoutUrl);
+        return;
+      }
+      this.toast.error('No fue posible iniciar el pago en línea.');
+    } catch (error) {
+      this.toast.error(describeError(error));
     } finally {
       this.saving.set(false);
     }
@@ -406,6 +450,6 @@ export class MyReservationsPage {
   }
 
   private emptyForm(): CreateMyReservationRequest {
-    return { unitId: '', commonAreaId: '', startTime: '', endTime: '', paymentMethod: 'NONE', notes: '' };
+    return { unitId: '', commonAreaId: '', startTime: '', endTime: '', paymentMethod: 'NONE', notes: '', acceptedTerms: false };
   }
 }

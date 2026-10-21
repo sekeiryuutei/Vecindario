@@ -78,7 +78,7 @@ public class JdbcReservationAdapter implements ReservationPort {
     @Override
     public List<Reservation> findOverlapping(UUID commonAreaId, Instant start, Instant end, UUID excludeId) {
         String sql = "SELECT " + COLS + " FROM {s}.reservations WHERE common_area_id = ? "
-                + "AND status IN ('PENDING_APPROVAL', 'APPROVED') "
+                + "AND status IN ('PENDING_PAYMENT', 'PENDING_APPROVAL', 'APPROVED') "
                 + "AND start_time < ? AND end_time > ?"
                 + (excludeId != null ? " AND id <> ?" : "");
         List<Object> args = new ArrayList<>();
@@ -94,7 +94,7 @@ public class JdbcReservationAdapter implements ReservationPort {
     @Override
     public int countActiveByUnit(UUID unitId) {
         Integer count = t.jdbc().queryForObject(
-                t.q("SELECT count(*) FROM {s}.reservations WHERE unit_id = ? AND status IN ('PENDING_APPROVAL', 'APPROVED') AND end_time > now()"),
+                t.q("SELECT count(*) FROM {s}.reservations WHERE unit_id = ? AND status IN ('PENDING_PAYMENT', 'PENDING_APPROVAL', 'APPROVED') AND end_time > now()"),
                 Integer.class, unitId);
         return count != null ? count : 0;
     }
@@ -107,7 +107,7 @@ public class JdbcReservationAdapter implements ReservationPort {
 
     @Override
     public List<Reservation> findByCommonAreaAndRange(UUID commonAreaId, Instant start, Instant end) {
-        return t.jdbc().query(t.q("SELECT " + COLS + " FROM {s}.reservations WHERE common_area_id = ? AND status IN ('PENDING_APPROVAL', 'APPROVED') AND start_time < ? AND end_time > ? ORDER BY start_time ASC"),
+        return t.jdbc().query(t.q("SELECT " + COLS + " FROM {s}.reservations WHERE common_area_id = ? AND status IN ('PENDING_PAYMENT', 'PENDING_APPROVAL', 'APPROVED') AND start_time < ? AND end_time > ? ORDER BY start_time ASC"),
                 MAPPER, commonAreaId, Jdbc.ts(end), Jdbc.ts(start));
     }
 
@@ -156,6 +156,18 @@ public class JdbcReservationAdapter implements ReservationPort {
                     updated_at = now()
                 WHERE id = ?
                 """), status.name(), rejectionReason, cancellationReason, id) > 0;
+    }
+
+    @Override
+    public boolean markPaid(UUID id, ReservationStatus status, String paymentReference) {
+        return t.jdbc().update(t.q("""
+                UPDATE {s}.reservations SET
+                    status = ?,
+                    payment_method = 'WOMPI',
+                    payment_reference = ?,
+                    updated_at = now()
+                WHERE id = ? AND status = 'PENDING_PAYMENT'
+                """), status.name(), paymentReference, id) > 0;
     }
 
     @Override

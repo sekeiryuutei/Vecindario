@@ -26,6 +26,7 @@ public class JdbcOnlinePaymentAdapter implements OnlinePaymentPort {
             rs.getString("reference"),
             rs.getObject("tenant_id", UUID.class),
             rs.getObject("unit_id", UUID.class),
+            rs.getObject("reservation_id", UUID.class),
             rs.getObject("user_id", UUID.class),
             rs.getLong("amount_in_cents"),
             rs.getString("currency"),
@@ -47,10 +48,10 @@ public class JdbcOnlinePaymentAdapter implements OnlinePaymentPort {
     @Override
     public OnlinePaymentIntent insert(OnlinePaymentIntent intent) {
         jdbc.update(
-                "INSERT INTO public.online_payment_intents (id, reference, tenant_id, unit_id, user_id, "
+                "INSERT INTO public.online_payment_intents (id, reference, tenant_id, unit_id, reservation_id, user_id, "
                         + "amount_in_cents, currency, signature, status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                intent.id(), intent.reference(), intent.tenantId(), intent.unitId(), intent.userId(),
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                intent.id(), intent.reference(), intent.tenantId(), intent.unitId(), intent.reservationId(), intent.userId(),
                 intent.amountInCents(), intent.currency(), intent.signature(), intent.status().name()
         );
         return findByReference(intent.reference()).orElseThrow();

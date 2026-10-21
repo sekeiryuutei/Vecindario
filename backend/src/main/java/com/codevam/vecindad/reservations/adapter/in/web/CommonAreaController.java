@@ -42,7 +42,10 @@ public class CommonAreaController {
             @Min(1) int maxActiveReservationsPerUnit,
             @Min(0) int minAdvanceHours,
             @Min(1) int maxAdvanceDays,
-            @Min(0) int cancellationDeadlineHours
+            @Min(0) int cancellationDeadlineHours,
+            @Size(max = 4000) String terms,
+            LocalTime approvalStartTime,
+            LocalTime approvalEndTime
     ) {}
 
     private final CommonAreaService commonAreaService;
@@ -80,6 +83,7 @@ public class CommonAreaController {
                 r.slotDurationMinutes(), r.maxSlotsPerReservation(),
                 r.maxActiveReservationsPerUnit(), r.minAdvanceHours(),
                 r.maxAdvanceDays(), r.cancellationDeadlineHours(),
+                r.terms() == null ? "" : r.terms(), r.approvalStartTime(), r.approvalEndTime(),
                 true, null, null
         ));
     }
@@ -96,6 +100,7 @@ public class CommonAreaController {
                 r.slotDurationMinutes(), r.maxSlotsPerReservation(),
                 r.maxActiveReservationsPerUnit(), r.minAdvanceHours(),
                 r.maxAdvanceDays(), r.cancellationDeadlineHours(),
+                r.terms() == null ? "" : r.terms(), r.approvalStartTime(), r.approvalEndTime(),
                 true, null, null
         ));
     }

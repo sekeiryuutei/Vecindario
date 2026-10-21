@@ -5,8 +5,10 @@ import com.codevam.vecindad.billing.application.PaymentService;
 import com.codevam.vecindad.billing.domain.Payment;
 import com.codevam.vecindad.billing.domain.PaymentMethod;
 import com.codevam.vecindad.config.AppProperties;
+import com.codevam.vecindad.integrations.TenantIntegrationService;
 import com.codevam.vecindad.people.application.port.out.UnitRelationPort;
 import com.codevam.vecindad.properties.application.port.out.PropertyUnitPort;
+import com.codevam.vecindad.reservations.application.ReservationService;
 import com.codevam.vecindad.shared.error.ApiException;
 import com.codevam.vecindad.shared.tenancy.TenantContext;
 import com.codevam.vecindad.tenancy.application.port.out.TenantPort;
@@ -55,7 +57,12 @@ class WompiWebhookSecurityTest {
         PropertyUnitPort units = Mockito.mock(PropertyUnitPort.class);
         UnitRelationPort relations = Mockito.mock(UnitRelationPort.class);
         payments = Mockito.mock(PaymentService.class);
+        ReservationService reservations = Mockito.mock(ReservationService.class);
         AuditService audit = Mockito.mock(AuditService.class);
+        TenantIntegrationService integrations = Mockito.mock(TenantIntegrationService.class);
+        when(integrations.wompi(any())).thenReturn(new TenantIntegrationService.WompiConfig(
+                true, "pub_prod_real", "prv_prod_real", SECRET, "integrity_prod_real",
+                "https://production.wompi.co/v1"));
 
         AppProperties props = new AppProperties("Vecindad", "CodeVam", "production", "https://vecindad.example.com",
                 new AppProperties.Mail(false, "no-reply@vecindad.example.com"),
@@ -70,11 +77,12 @@ class WompiWebhookSecurityTest {
                 new AppProperties.Storage("/var/lib/vecindad-storage"),
                 new AppProperties.Maintenance("0 30 3 * * *", 30));
 
-        service = new WompiService(onlinePayments, tenants, units, relations, payments, audit, props, Clock.systemUTC());
+        service = new WompiService(onlinePayments, tenants, units, relations, payments, reservations,
+                audit, props, integrations, Clock.systemUTC());
 
         tenantId = UUID.randomUUID();
         pendingIntent = new OnlinePaymentIntent(UUID.randomUUID(), REFERENCE, tenantId, UUID.randomUUID(),
-                UUID.randomUUID(), 500_000L, "COP", "signature", OnlinePaymentIntent.IntentStatus.PENDING,
+                null, UUID.randomUUID(), 500_000L, "COP", "signature", OnlinePaymentIntent.IntentStatus.PENDING,
                 null, null, null, null, null, Instant.now(), Instant.now());
         when(onlinePayments.findByReference(REFERENCE)).thenReturn(Optional.of(pendingIntent));
     }

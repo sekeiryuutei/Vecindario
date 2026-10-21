@@ -30,9 +30,7 @@ public class CommonAreaService {
 
     @Transactional
     public CommonArea create(CommonArea area) {
-        if (area.openingTime().isAfter(area.closingTime()) || area.openingTime().equals(area.closingTime())) {
-            throw ApiException.badRequest("INVALID_TIMES", "La hora de apertura debe ser anterior a la hora de cierre.");
-        }
+        validate(area);
         CommonArea toSave = new CommonArea(
                 UUID.randomUUID(), area.name(), area.description(), area.capacity(),
                 area.requiresPayment(), area.pricePerSlot(), area.depositAmount(),
@@ -40,6 +38,8 @@ public class CommonAreaService {
                 area.slotDurationMinutes(), area.maxSlotsPerReservation(),
                 area.maxActiveReservationsPerUnit(), area.minAdvanceHours(),
                 area.maxAdvanceDays(), area.cancellationDeadlineHours(),
+                area.terms() == null ? "" : area.terms(),
+                area.approvalStartTime(), area.approvalEndTime(),
                 true, Instant.now(), Instant.now()
         );
         return port.insert(toSave);
@@ -48,9 +48,7 @@ public class CommonAreaService {
     @Transactional
     public CommonArea update(UUID id, CommonArea area) {
         CommonArea existing = getById(id);
-        if (area.openingTime().isAfter(area.closingTime()) || area.openingTime().equals(area.closingTime())) {
-            throw ApiException.badRequest("INVALID_TIMES", "La hora de apertura debe ser anterior a la hora de cierre.");
-        }
+        validate(area);
         CommonArea updated = new CommonArea(
                 existing.id(), area.name(), area.description(), area.capacity(),
                 area.requiresPayment(), area.pricePerSlot(), area.depositAmount(),
@@ -58,10 +56,35 @@ public class CommonAreaService {
                 area.slotDurationMinutes(), area.maxSlotsPerReservation(),
                 area.maxActiveReservationsPerUnit(), area.minAdvanceHours(),
                 area.maxAdvanceDays(), area.cancellationDeadlineHours(),
+                area.terms() == null ? "" : area.terms(),
+                area.approvalStartTime(), area.approvalEndTime(),
                 area.isActive(), existing.createdAt(), Instant.now()
         );
         port.update(updated);
         return getById(id);
+    }
+
+    private void validate(CommonArea area) {
+        if (area.openingTime().isAfter(area.closingTime()) || area.openingTime().equals(area.closingTime())) {
+            throw ApiException.badRequest("INVALID_TIMES", "La hora de apertura debe ser anterior a la hora de cierre.");
+        }
+        if (area.approvalStartTime() != null
+                && (area.approvalStartTime().isBefore(area.openingTime())
+                    || area.approvalStartTime().isAfter(area.closingTime()))) {
+            throw ApiException.badRequest("INVALID_APPROVAL_WINDOW",
+                    "La ventana de aprobación debe estar dentro del horario de funcionamiento.");
+        }
+        if (area.approvalEndTime() != null
+                && (area.approvalEndTime().isBefore(area.openingTime())
+                    || area.approvalEndTime().isAfter(area.closingTime()))) {
+            throw ApiException.badRequest("INVALID_APPROVAL_WINDOW",
+                    "La ventana de aprobación debe estar dentro del horario de funcionamiento.");
+        }
+        if (area.approvalStartTime() != null && area.approvalEndTime() != null
+                && !area.approvalStartTime().isBefore(area.approvalEndTime())) {
+            throw ApiException.badRequest("INVALID_APPROVAL_WINDOW",
+                    "El inicio de la ventana de aprobación debe ser anterior a su fin.");
+        }
     }
 
     @Transactional

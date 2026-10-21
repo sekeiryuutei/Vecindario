@@ -151,13 +151,16 @@ Antes de exponer el servicio:
    si se compila la app nativa, los orígenes exactos `https://localhost` y `capacitor://localhost`.
 3. Claves nuevas y robustas para PostgreSQL, Redis, JWT (48+ bytes), Wompi, SMTP y WhatsApp. En Wompi, el secreto de
    integridad y el de eventos deben ser distintos; el redirect debe ser HTTPS público.
-4. TLS terminado en un proxy delante de Nginx, backups programados y restauración probada.
-5. `STORAGE_LOCAL_DIR` en un volumen persistente (el compose ya monta `vecindad_storage`).
-6. Si se habilitan WhatsApp y respuestas del asistente, configura `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`,
+4. `INTEGRATIONS_ENCRYPTION_KEY` con 32 bytes o más (openssl rand -hex 48): cifra las credenciales de Wompi y del
+   proveedor de IA que cada copropiedad defina desde el área de plataforma. Sin esta variable el backend no arranca en
+   producción.
+5. TLS terminado en un proxy delante de Nginx, backups programados y restauración probada.
+6. `STORAGE_LOCAL_DIR` en un volumen persistente (el compose ya monta `vecindad_storage`).
+7. Si se habilitan WhatsApp y respuestas del asistente, configura `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`,
    `WHATSAPP_ACCESS_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID`; registra
    `https://TU_DOMINIO/api/v1/public/whatsapp/webhook`. Revisa `AI_*`/`GEMINI_*` y deja el respaldo local como última
    opción.
-7. En una instalación nueva sin seed, define `APP_BOOTSTRAP_EMAIL` y `APP_BOOTSTRAP_PASSWORD` durante el primer
+8. En una instalación nueva sin seed, define `APP_BOOTSTRAP_EMAIL` y `APP_BOOTSTRAP_PASSWORD` durante el primer
    arranque para crear el superadministrador de plataforma. Verifica el acceso y retira esas dos variables del entorno.
 
 El backend **no arranca** en producción si detecta seed activo, Swagger público, secretos de ejemplo, CORS inseguro,
