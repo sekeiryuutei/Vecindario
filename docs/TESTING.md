@@ -90,6 +90,106 @@ Docker; localmente requiere el stack healthy y Chromium instalado. Los reportes 
 `mvn -B verify` genera `backend/target/site/jacoco/` y falla si la cobertura de líneas baja de 45%. La medición actual es
 53,57% de líneas, 42,84% de ramas y 58,66% de métodos.
 
+## Recorrido manual por pantalla
+
+Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
+
+| Rol | Usuario | Alcance |
+|---|---|---|
+| Superadmin | `superadmin@vecindad.local` | Plataforma |
+| Administrador | `admin@vecindad.local` | Demo Norte y Demo Sur |
+| Administrador Sur | `admin.sur@demo-sur.local` | Demo Sur |
+| Secretaría | `secretaria@demo-norte.local` | Operación administrativa |
+| Contador | `contador@demo-norte.local` | Cartera y pagos |
+| Consejo | `consejo@demo-norte.local` | Consulta y aprobación |
+| Portería | `portero@demo-norte.local` | Control de acceso |
+| Propietario | `propietario@demo-norte.local` | Portal del residente |
+
+### Públicas
+
+| Pantalla | Ruta | Prueba mínima |
+|---|---|---|
+| Login | `/login` | Entrar con cada rol; una contraseña incorrecta debe mostrar error genérico |
+| Recuperación | `/recuperar` | Solicitar enlace; abrir el enlace recibido y cambiar la contraseña |
+| Restablecer | `/restablecer?token=...` | Validar token de un solo uso y política de contraseña |
+| Selección de copropiedad | `/seleccionar-copropiedad` | Con `admin@vecindad.local`, cambiar entre Demo Norte y Demo Sur |
+| Verificación de certificado | `/verificar-certificado` | Pegar el código de un certificado emitido y comprobar validez |
+| Resultado Wompi | `/pagos/wompi/resultado?reference=...` | Consultar una intención; sin redirect público se usa la referencia generada |
+
+### Administración
+
+| Pantalla | Ruta | Prueba mínima |
+|---|---|---|
+| Inicio | `/app/inicio` | Ver indicadores y accesos; deben cambiar al cambiar de copropiedad |
+| Propiedades | `/app/propiedades` | Listar, crear/editar inmueble y revisar relaciones |
+| Personas | `/app/personas` | Crear/editar persona y vincular una cuenta de usuario |
+| Vehículos | `/app/vehiculos` | Crear vehículo; intentar editar uno que está dentro debe fallar |
+| Cartera | `/app/cartera` | Ver cartera, estado de cuenta, crear cargo y ejecutar facturación |
+| Pagos | `/app/pagos` | Registrar pago, ver imputaciones y revertir con motivo |
+| Conciliación | `/app/conciliacion` | Subir CSV, revisar filas, conciliar manualmente y revertir |
+| Certificados | `/app/certificados` | Emitir certificado, descargar PDF y verificar el código |
+| Reservas | `/app/reservas` | Configurar zona común, crear reserva y aprobar/cancelar |
+| PQRS | `/app/pqrs` | Crear, responder, cambiar estado y revisar SLA |
+| Comunicados | `/app/comunicados` | Publicar comunicado y comprobar lectura del residente |
+| Notificaciones | `/app/notificaciones` | Revisar configuración y logs; WhatsApp está deshabilitado temporalmente |
+| Documentos | `/app/documentos` | Subir, listar, descargar y restringir por rol |
+| Asambleas | `/app/asambleas` | Crear asamblea, agenda, asistencia, votación y acta |
+| Proveedores | `/app/proveedores` | Crear proveedor, contrato y póliza |
+| Mantenimiento | `/app/mantenimiento` | Crear activo, plan y orden de trabajo |
+| Presupuesto | `/app/presupuesto` | Crear presupuesto, rubros y consultar ejecución |
+| Nómina | `/app/nomina` | Parámetros, empleado, periodo, calcular, pagar, anular y exportar CSV |
+| Reportes | `/app/reportes` | Generar reporte y exportar CSV/PDF |
+| Auditoría | `/app/auditoria` | Ver eventos de las acciones anteriores |
+| Usuarios | `/app/usuarios` | Invitar usuario, asignar rol y revocar acceso |
+| Roles | `/app/roles` | Revisar permisos por rol y su efecto en el menú |
+| Configuración | `/app/configuracion` | Editar datos, activar/desactivar canales y revisar ajustes |
+
+### Portería
+
+| Pantalla | Ruta | Prueba mínima |
+|---|---|---|
+| Control de acceso | `/app/porteria/control` | Buscar placa, registrar entrada y salida; duplicados deben rechazarse |
+| Visitantes | `/app/porteria/visitantes` | Validar QR, registrar ingreso, crear visitante sin invitación y autorizar |
+| Paquetes | `/app/porteria/paquetes` | Recibir paquete y entregarlo; una segunda entrega debe fallar |
+| Novedades | `/app/porteria/novedades` | Registrar novedad y verla en administración |
+
+### Residente
+
+| Pantalla | Ruta | Prueba mínima |
+|---|---|---|
+| Inmuebles | `/app/residente/inmuebles` | Ver los inmuebles propios y sus relaciones |
+| Vehículos | `/app/residente/vehiculos` | Crear/editar un vehículo propio |
+| Estado de cuenta | `/app/residente/estado-cuenta` | Ver movimientos y crear intención Wompi desde `$1.500` |
+| Certificados | `/app/residente/certificados` | Solicitar/descargar certificado y verificar su código |
+| Visitas | `/app/residente/visitas` | Crear invitación con QR y autorizar una visita pendiente |
+| Reservas | `/app/residente/reservas` | Reservar una zona común y cancelar si aplica |
+| PQRS | `/app/residente/pqrs` | Crear PQRS y seguir la respuesta |
+| Comunicados | `/app/residente/comunicados` | Leer y marcar comunicados |
+| Asambleas | `/app/residente/asambleas` | Registrar asistencia y votar |
+| Documentos | `/app/residente/documentos` | Descargar documentos permitidos |
+| Paquetes | `/app/residente/paquetes` | Ver paquetes recibidos/entregados |
+
+### Plataforma
+
+| Pantalla | Ruta | Prueba mínima |
+|---|---|---|
+| Dashboard | `/app/plataforma` | Ver métricas globales |
+| Empresas | `/app/plataforma/empresas` | Crear/editar empresa |
+| Copropiedades | `/app/plataforma/copropiedades` | Crear/editar copropiedad y sus feature flags |
+| Auditoría global | `/app/plataforma/auditoria` | Ver eventos de plataforma |
+
+### Flujo integrado de 10 minutos
+
+1. Entrar como administrador, cambiar a Demo Norte y crear una visita desde el portal del propietario.
+2. Entrar como portería, validar el QR, registrar el ingreso y entregar un paquete.
+3. Como administrador, crear un cargo; como propietario, pagarlo y revisar el estado de cuenta.
+4. Crear una PQRS y una reserva; responder y aprobar desde administración.
+5. Emitir un certificado, descargarlo y verificarlo desde la página pública.
+6. Subir un documento y comprobarlo desde el portal del residente.
+7. Crear una asamblea, registrar asistencia y votar.
+8. Generar una corrida de nómina, pagarla y exportar el CSV.
+9. Revisar auditoría y cerrar sesión.
+
 ## Verificación de producción
 
 Se validó un arranque limpio con `SPRING_PROFILES_ACTIVE=production`, PostgreSQL y Redis nuevos, sin seed: health `UP`,
@@ -98,8 +198,9 @@ Flyway hasta `V12` global y `V9` por tenant, `/v3/api-docs` con `404`, cero tena
 Swagger, CORS local, secretos débiles, secretos Wompi iguales, SMTP ausente, Wompi de pruebas, WhatsApp incompleto y
 storage efímero.
 
-El webhook de Wompi se probó con eventos firmados; el checkout de sandbox carga, pero la finalización del pago requiere el
-secreto de integridad correcto del panel de Wompi (ver `docs/HANDOFF.md`, pendientes externos).
+El flujo Wompi se verificó de extremo a extremo en sandbox: checkout real con tarjeta de prueba, transacción aprobada,
+webhook firmado, intención `APPROVED` y pago reflejado en el estado de cuenta. El webhook público real requiere un dominio
+HTTPS; en local se valida con un evento firmado (ver `docs/HANDOFF.md`).
 
 También se verificó CORS real: preflight desde `https://localhost`, `capacitor://localhost` e `ionic://localhost`
 devuelve `Access-Control-Allow-Origin`; un origen `http://localhost:3000` se rechaza. `npm audit --omit=dev` no reporta

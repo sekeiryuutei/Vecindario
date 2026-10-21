@@ -266,19 +266,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 **Verificado en el entorno local:** arranque Docker, migraciones, 118 unitarias, 51 IT, cobertura 53,57% de líneas,
 Playwright 5/5, smoke de 23 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
-webhook de WhatsApp firmado/idempotente y configuración productiva fail-closed.
+webhook de WhatsApp firmado/idempotente, envío y recepción real de WhatsApp, pago Wompi aprobado en sandbox con webhook
+reconciliado y configuración productiva fail-closed.
 
 **Pendiente para producción (requiere decisiones o credenciales del propietario):**
 
 - Dominio público, DNS y TLS; `APP_PUBLIC_URL`, `WOMPI_REDIRECT_URL` y `CORS_ALLOWED_ORIGINS` definitivos.
 - Secretos productivos: JWT, PostgreSQL, Redis, SMTP, Wompi y WhatsApp. El `WOMPI_INTEGRITY_SECRET` debe ser el secreto
-  de integridad del panel, **distinto** del secreto de eventos. En la configuración local actual ambos valores coinciden:
-  el checkout de sandbox carga, pero al pagar Wompi responde “La firma es inválida”. Sin ese secreto no se puede
-  completar un pago real de prueba; el webhook y la lógica de negocio sí están verificados con eventos firmados.
+  de integridad del panel, **distinto** del secreto de eventos. En sandbox ya se completó un pago real con tarjeta de
+  prueba y el webhook reconcilió la intención; en producción faltan las llaves y secretos productivos.
 - Wompi de producción con llaves y secretos productivos; el checkout de desarrollo debe dejar `WOMPI_REDIRECT_URL` vacío
-  porque Wompi rechaza redirects HTTP/localhost. En producción el redirect es HTTPS obligatorio.
-- WhatsApp: número de negocio real, token rotado, app de Meta dedicada, plantillas aprobadas y webhook público. El token
-  actual parece pertenecer a otra app; no debe reutilizarse en producción.
+  porque Wompi rechaza redirects HTTP/localhost. En producción el redirect y el webhook deben ser HTTPS públicos.
+- WhatsApp: número de negocio real, token rotado, app de Meta dedicada, plantillas aprobadas y webhook público. El envío
+  y la recepción real ya se validaron con el token actual; ese token se usará temporalmente en otra aplicación, por lo
+  que el canal quedó deshabilitado en el `.env` local. No debe reutilizarse en producción sin una app dedicada.
 - Almacenamiento S3 compatible (aún solo existe `LocalStorageAdapter`), firma/publicación Android/iOS, notificaciones
   push FCM/APNs y el modelo de cobro por pago (la comisión de Wompi hace inviable una tarifa de 2–5 COP).
 - Respaldos programados, restauración probada y monitoreo/alertas del host y los contenedores.

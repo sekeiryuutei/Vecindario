@@ -602,47 +602,51 @@ if ($payRun.Json.status -eq 'CALCULATED') {
 }
 
 Write-Host '23) WhatsApp: verificacion, firma e idempotencia'
-$waVerifyToken = $envMap['WHATSAPP_VERIFY_TOKEN']
-$waAppSecret = $envMap['WHATSAPP_APP_SECRET']
-Check 'credenciales de WhatsApp configuradas' ($waVerifyToken -and $waAppSecret)
-Check 'canal WhatsApp habilitado en la copropiedad' ($tenant.Json.features.WHATSAPP -eq $true)
-if ($waVerifyToken -and $waAppSecret) {
-  $challenge = "smoke-$runId"
-  $verifyQuery = "hub.mode=subscribe&hub.verify_token=$([uri]::EscapeDataString($waVerifyToken))&hub.challenge=$challenge"
-  $waVerify = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook?$verifyQuery" -UseBasicParsing
-  Check 'webhook GET responde el challenge' ($waVerify.StatusCode -eq 200 -and $waVerify.Content -eq $challenge)
+if ($envMap['WHATSAPP_ENABLED'] -ne 'true') {
+  Write-Host '  SKIP WhatsApp deshabilitado en .env' -ForegroundColor Yellow
+} else {
+  $waVerifyToken = $envMap['WHATSAPP_VERIFY_TOKEN']
+  $waAppSecret = $envMap['WHATSAPP_APP_SECRET']
+  Check 'credenciales de WhatsApp configuradas' ($waVerifyToken -and $waAppSecret)
+  Check 'canal WhatsApp habilitado en la copropiedad' ($tenant.Json.features.WHATSAPP -eq $true)
+  if ($waVerifyToken -and $waAppSecret) {
+    $challenge = "smoke-$runId"
+    $verifyQuery = "hub.mode=subscribe&hub.verify_token=$([uri]::EscapeDataString($waVerifyToken))&hub.challenge=$challenge"
+    $waVerify = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook?$verifyQuery" -UseBasicParsing
+    Check 'webhook GET responde el challenge' ($waVerify.StatusCode -eq 200 -and $waVerify.Content -eq $challenge)
 
-  $waMsg = @{
-    object = 'whatsapp_business_account'
-    entry = @(@{
-      id = 'smoke'
-      changes = @(@{
-        field = 'messages'
-        value = @{
-          messaging_product = 'whatsapp'
-          metadata = @{ display_phone_number = 'smoke'; phone_number_id = $envMap['WHATSAPP_PHONE_NUMBER_ID'] }
-          messages = @(@{
-            from = '573000000002'
-            id = "wamid.smoke.$runId"
-            timestamp = "$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
-            type = 'text'
-            text = @{ body = 'Hola, necesito ayuda con una reserva' }
-          })
-        }
+    $waMsg = @{
+      object = 'whatsapp_business_account'
+      entry = @(@{
+        id = 'smoke'
+        changes = @(@{
+          field = 'messages'
+          value = @{
+            messaging_product = 'whatsapp'
+            metadata = @{ display_phone_number = 'smoke'; phone_number_id = $envMap['WHATSAPP_PHONE_NUMBER_ID'] }
+            messages = @(@{
+              from = '573000000002'
+              id = "wamid.smoke.$runId"
+              timestamp = "$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+              type = 'text'
+              text = @{ body = 'Hola, necesito ayuda con una reserva' }
+            })
+          }
+        })
       })
-    })
+    }
+    $waBody = $waMsg | ConvertTo-Json -Compress -Depth 12
+    $waSig = 'sha256=' + (HmacSha256Hex $waBody $waAppSecret)
+    $waResp = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = $waSig } -UseBasicParsing
+    Check 'webhook POST firmado procesado' ($waResp.StatusCode -eq 200)
+    $waDup = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = $waSig } -UseBasicParsing
+    Check 'webhook POST idempotente' ($waDup.StatusCode -eq 200)
+    try {
+      $waBad = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = 'sha256=00' } -UseBasicParsing
+      $waBadStatus = [int]$waBad.StatusCode
+    } catch { $waBadStatus = [int]$_.Exception.Response.StatusCode }
+    Check 'webhook con firma invalida rechazado (403)' ($waBadStatus -eq 403)
   }
-  $waBody = $waMsg | ConvertTo-Json -Compress -Depth 12
-  $waSig = 'sha256=' + (HmacSha256Hex $waBody $waAppSecret)
-  $waResp = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = $waSig } -UseBasicParsing
-  Check 'webhook POST firmado procesado' ($waResp.StatusCode -eq 200)
-  $waDup = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = $waSig } -UseBasicParsing
-  Check 'webhook POST idempotente' ($waDup.StatusCode -eq 200)
-  try {
-    $waBad = Invoke-WebRequest -Uri "$base/public/whatsapp/webhook" -Method POST -Body $waBody -ContentType 'application/json' -Headers @{ 'X-Hub-Signature-256' = 'sha256=00' } -UseBasicParsing
-    $waBadStatus = [int]$waBad.StatusCode
-  } catch { $waBadStatus = [int]$_.Exception.Response.StatusCode }
-  Check 'webhook con firma invalida rechazado (403)' ($waBadStatus -eq 403)
 }
 
 if ($fails -eq 0) { Write-Host 'TODO OK' -ForegroundColor Green } else { Write-Host "HAY $fails FALLOS" -ForegroundColor Red; exit 1 }
