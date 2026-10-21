@@ -99,7 +99,7 @@ import {
   waterOutline
 } from 'ionicons/icons';
 
-addIcons({
+const iconSet = {
   addOutline,
   alertCircleOutline,
   archiveOutline,
@@ -197,4 +197,10 @@ addIcons({
   walletOutline,
   warningOutline,
   waterOutline
-});
+};
+
+const lowercaseIcons = Object.fromEntries(
+  Object.entries(iconSet).map(([name, svg]) => [name.toLowerCase(), svg])
+);
+
+addIcons({ ...iconSet, ...lowercaseIcons });

@@ -13,10 +13,11 @@ export async function login(page: Page, email: string): Promise<void> {
 }
 
 export async function selectTenant(page: Page, name: string): Promise<void> {
-  const current = await page.locator('.topbar-title').innerText().catch(() => '');
-  if (new RegExp(name, 'i').test(current)) return;
-
   if (!page.url().includes('seleccionar-copropiedad')) {
+    const topbar = page.locator('.topbar-title');
+    const current = (await topbar.count()) ? await topbar.innerText() : '';
+    if (new RegExp(name, 'i').test(current)) return;
+
     const switchLink = page.getByRole('link', { name: 'Cambiar copropiedad' });
     if (await switchLink.isVisible().catch(() => false)) {
       await switchLink.click();
