@@ -2,6 +2,30 @@ import { expect, Page } from '@playwright/test';
 
 export const DEMO_PASSWORD = process.env.E2E_PASSWORD ?? 'Demo#2026!';
 
+const tenantTokens = new Map<string, string>();
+
+function tenantTokenKey(email: string, tenantName: string): string {
+  return `${email.toLowerCase()}|${tenantName.toLowerCase()}`;
+}
+
+export function cachedTenantToken(email: string, tenantName: string): string | undefined {
+  return tenantTokens.get(tenantTokenKey(email, tenantName));
+}
+
+async function rememberTenantToken(page: Page, email: string, tenantName: string): Promise<void> {
+  const token = await page.evaluate(() => {
+    const raw = localStorage.getItem('vecindad.session.v1');
+    if (!raw) return null;
+    try {
+      const session = JSON.parse(raw) as { accessToken?: string };
+      return session.accessToken ?? null;
+    } catch {
+      return null;
+    }
+  });
+  if (token) tenantTokens.set(tenantTokenKey(email, tenantName), token);
+}
+
 export async function login(page: Page, email: string): Promise<void> {
   await page.goto('/login');
   await page.locator('#email').fill(email);
@@ -39,4 +63,5 @@ export async function loginTenant(page: Page, email: string, tenantName: string)
   await login(page, email);
   await selectTenant(page, tenantName);
   await expectTenantShell(page, tenantName);
+  await rememberTenantToken(page, email, tenantName);
 }

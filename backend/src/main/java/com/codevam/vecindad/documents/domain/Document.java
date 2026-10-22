@@ -8,6 +8,7 @@ public record Document(
         String title,
         String description,
         DocumentCategory category,
+        UUID unitId,
         String storageKey,
         String fileName,
         long fileSize,

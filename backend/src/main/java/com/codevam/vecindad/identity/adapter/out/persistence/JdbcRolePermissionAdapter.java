@@ -60,4 +60,10 @@ public class JdbcRolePermissionAdapter implements RolePermissionPort {
         String table = SchemaNames.quoted(SchemaNames.requireTenantSchema(tenantSchema)) + ".role_permission_overrides";
         jdbc.update("DELETE FROM " + table + " WHERE role_code = ? AND permission_code = ?", roleCode, permissionCode);
     }
+
+    @Override
+    public void clearOverrides(String tenantSchema, String roleCode) {
+        String table = SchemaNames.quoted(SchemaNames.requireTenantSchema(tenantSchema)) + ".role_permission_overrides";
+        jdbc.update("DELETE FROM " + table + " WHERE role_code = ?", roleCode);
+    }
 }

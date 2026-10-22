@@ -54,4 +54,34 @@ public class RoleService {
                 Map.of("permission", permission, "granted", granted));
         return new RoleView(role, new TreeSet<>(port.effective(me.tenantSchema(), role)), true);
     }
+
+    @Transactional
+    public RoleView resetPermission(String role, String permission) {
+        AuthenticatedUser me = CurrentUser.requireTenant();
+        validateEditableRole(role);
+        if (!port.permissionExists(permission)) {
+            throw ApiException.badRequest("INVALID_PERMISSION", "El permiso indicado no existe.");
+        }
+        port.clearOverride(me.tenantSchema(), role, permission);
+        audit.log(me.tenantId(), "ROLE_PERMISSION_RESET", "ROLE", role, true, Map.of("permission", permission));
+        return new RoleView(role, new TreeSet<>(port.effective(me.tenantSchema(), role)), true);
+    }
+
+    @Transactional
+    public RoleView resetRole(String role) {
+        AuthenticatedUser me = CurrentUser.requireTenant();
+        validateEditableRole(role);
+        port.clearOverrides(me.tenantSchema(), role);
+        audit.log(me.tenantId(), "ROLE_PERMISSIONS_RESET", "ROLE", role, true, Map.of());
+        return new RoleView(role, new TreeSet<>(port.effective(me.tenantSchema(), role)), true);
+    }
+
+    private void validateEditableRole(String role) {
+        if (!Roles.TENANT_ROLES.contains(role)) {
+            throw ApiException.badRequest("INVALID_ROLE", "El rol indicado no existe.");
+        }
+        if (Roles.ADMINISTRADOR.equals(role)) {
+            throw ApiException.conflict("ROLE_LOCKED", "El rol ADMINISTRADOR siempre conserva todos los permisos.");
+        }
+    }
 }

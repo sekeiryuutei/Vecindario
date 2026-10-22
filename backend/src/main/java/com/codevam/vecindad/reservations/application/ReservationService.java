@@ -100,9 +100,12 @@ public class ReservationService {
         }
 
         // 3. Validación de horario de funcionamiento
-        LocalTime localStart = cmd.startTime().atZone(BOGOTA).toLocalTime();
-        LocalTime localEnd = cmd.endTime().atZone(BOGOTA).toLocalTime();
-        if (localStart.isBefore(area.openingTime()) || localEnd.isAfter(area.closingTime())) {
+        ZonedDateTime zonedStart = cmd.startTime().atZone(BOGOTA);
+        ZonedDateTime zonedEnd = cmd.endTime().atZone(BOGOTA);
+        LocalTime localStart = zonedStart.toLocalTime();
+        LocalTime localEnd = zonedEnd.toLocalTime();
+        if (!zonedStart.toLocalDate().equals(zonedEnd.toLocalDate())
+                || localStart.isBefore(area.openingTime()) || localEnd.isAfter(area.closingTime())) {
             throw ApiException.badRequest("OUTSIDE_OPERATING_HOURS", "El horario reservado está fuera del horario de funcionamiento ("
                     + area.openingTime() + " a " + area.closingTime() + ").");
         }
@@ -177,7 +180,7 @@ public class ReservationService {
             return false;
         }
         CommonArea area = commonAreaPort.findById(r.commonAreaId())
-                .orElseThrow(() -> ApiException.notFound("Zona comǧn no encontrada."));
+                .orElseThrow(() -> ApiException.notFound("Zona común no encontrada."));
         ReservationStatus next = requiresApproval(area, r.startTime(), r.endTime())
                 ? ReservationStatus.PENDING_APPROVAL
                 : ReservationStatus.APPROVED;

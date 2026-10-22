@@ -3,6 +3,7 @@ package com.codevam.vecindad.documents.adapter.in.web;
 import com.codevam.vecindad.documents.application.DocumentService;
 import com.codevam.vecindad.documents.domain.Document;
 import com.codevam.vecindad.documents.domain.DocumentCategory;
+import com.codevam.vecindad.properties.application.PropertyUnitService;
 import com.codevam.vecindad.shared.error.ApiException;
 import com.codevam.vecindad.shared.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,16 +28,19 @@ import java.util.UUID;
 public class AdminDocumentController {
 
     private final DocumentService service;
+    private final PropertyUnitService units;
 
-    public AdminDocumentController(DocumentService service) {
+    public AdminDocumentController(DocumentService service, PropertyUnitService units) {
         this.service = service;
+        this.units = units;
     }
 
-    @Operation(summary = "Lista todos los documentos activos")
+    @Operation(summary = "Lista todos los documentos activos, opcionalmente de un inmueble")
     @GetMapping
     @PreAuthorize("hasAuthority('DOCUMENTS_MANAGE')")
-    public List<Document> list(@RequestParam(required = false) DocumentCategory category) {
-        return service.listAll(category);
+    public List<Document> list(@RequestParam(required = false) DocumentCategory category,
+                               @RequestParam(required = false) UUID unitId) {
+        return unitId == null ? service.listAll(category) : service.listByUnit(unitId, category);
     }
 
     @Operation(summary = "Sube un nuevo documento a la copropiedad")
@@ -48,16 +52,20 @@ public class AdminDocumentController {
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("category") DocumentCategory category,
-            @RequestParam(value = "minimumRole", defaultValue = "RESIDENTE") String minimumRole
+            @RequestParam(value = "minimumRole", defaultValue = "RESIDENTE") String minimumRole,
+            @RequestParam(value = "unitId", required = false) UUID unitId
     ) {
         if (file == null || file.isEmpty()) {
             throw ApiException.badRequest("EMPTY_FILE", "El archivo no puede estar vacío.");
+        }
+        if (unitId != null) {
+            units.get(unitId);
         }
         UUID userId = CurrentUser.requireTenant().userId();
         try {
             return service.upload(
                     userId, title, description, category, minimumRole,
-                    file.getOriginalFilename(), file.getContentType(), file.getBytes()
+                    file.getOriginalFilename(), file.getContentType(), unitId, file.getBytes()
             );
         } catch (IOException e) {
             throw ApiException.badRequest("FILE_PROCESSING_ERROR", "Error al procesar archivo: " + e.getMessage());

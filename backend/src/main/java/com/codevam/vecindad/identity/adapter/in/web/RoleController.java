@@ -45,4 +45,18 @@ public class RoleController {
                                               @Valid @RequestBody PermissionChangeRequest req) {
         return service.setPermission(role, permission, req.granted());
     }
+
+    @Operation(summary = "Restablece un permiso de un rol a su valor base")
+    @DeleteMapping("/{role}/permissions/{permission}")
+    @PreAuthorize("hasAuthority('ROLES_MANAGE')")
+    public RoleService.RoleView resetPermission(@PathVariable String role, @PathVariable String permission) {
+        return service.resetPermission(role, permission);
+    }
+
+    @Operation(summary = "Restablece todos los permisos de un rol a su valor base")
+    @DeleteMapping("/{role}/permissions")
+    @PreAuthorize("hasAuthority('ROLES_MANAGE')")
+    public RoleService.RoleView resetRole(@PathVariable String role) {
+        return service.resetRole(role);
+    }
 }

@@ -12,6 +12,8 @@ public interface DocumentPort {
     Optional<Document> findById(UUID id);
     List<Document> listAll(DocumentCategory category);
     List<Document> listVisibleForRole(List<String> allowedRoles, DocumentCategory category);
+    List<Document> listByUnit(UUID unitId, DocumentCategory category);
+    List<Document> listVisibleForRoleByUnit(List<String> allowedRoles, UUID unitId);
     boolean delete(UUID id);
 }
 

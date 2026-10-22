@@ -4,7 +4,7 @@
 
 ```bash
 cd backend
-mvn -B test         # 157 pruebas unitarias (sin Docker)
+mvn -B test         # 205 pruebas unitarias (sin Docker)
 mvn -B verify       # 51 IT con PostgreSQL real + JaCoCo (requiere Docker)
 
 cd ../frontend
@@ -20,9 +20,10 @@ Con el sistema levantado y seed activo:
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-El smoke test recorre 24 secciones: salud, login multi-copropiedad, aislamiento, portería, visitantes, cartera,
+El smoke test recorre 30 secciones: salud, login multi-copropiedad, aislamiento, portería, visitantes, cartera,
 conciliación, Wompi, certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento,
-presupuesto, reportes, autogestión, nómina, WhatsApp y mascotas.
+presupuesto, reportes, autogestión, nómina, WhatsApp, mascotas, junta directiva, citas, capacitaciones, personal
+operativo, expediente del inmueble y matriz de roles y permisos.
 La app nativa se sincroniza con `APP_PUBLIC_URL` HTTPS y `APP_NAME`:
 
 ```powershell
@@ -31,7 +32,7 @@ $env:APP_NAME='Mi Copropiedad'
 npm run cap:sync
 ```
 
-## Unitarias (157)
+## Unitarias (200)
 
 - `SchemaNamesTest`, `TenantContextTest`: saneamiento de identificadores y contexto de tenant.
 - `JwtServiceTest`: firma, expiración, llave ajena, secreto corto o de desarrollo en producción.
@@ -48,6 +49,9 @@ npm run cap:sync
 - `StatementRowMapperTest`, `MatchingEngineTest`: parseo de extractos y motor de conciliación.
 - `ReservationServiceTest`, `PqrServiceTest`, `AssemblyServiceTest`, `BudgetServiceTest`, `MaintenanceServiceTest`,
   `SupplierServiceTest`, `ReportServiceTest`, `CameraServiceTest`, `CertificatePdfTest`, `PetServiceTest`.
+- `AppointmentServiceTest`, `TrainingServiceTest`, `StaffServiceTest`, `BoardServiceTest`, `UnitFileServiceTest` y
+  `RoleServiceTest`: reglas de agenda y franja única, horarios, cupos e inscripciones, asistencia, borrado seguro de
+  capacitaciones, cargos de junta, notas internas/públicas del expediente y restablecimiento de permisos por rol.
 - `PayrollServiceTest`: parámetros, novedades, aportes/provisiones, generación, recalculo, pago, anulación y numeración
   versionada al regenerar un periodo anulado.
 - `TenantAdminServiceTest`: edición de datos y límites de los canales autogestionables.
@@ -83,13 +87,14 @@ unitarias; sus flujos HTTP completos se validan en el smoke test.
 `APP_PUBLIC_URL=... APP_NAME=... npm run cap:sync` valida además la sincronización Android/iOS y escribe la API absoluta
 en `runtime-config.json`.
 
-Playwright cubre diez flujos con `E2E_BASE_URL` (por defecto `http://localhost:48124`) y la contraseña demo:
-administrador, residente, portería y plataforma, incluido el cambio de copropiedad, el alta/baja de mascotas por
-administración y residente, y el alta de mascotas propias. En CI se ejecuta después de levantar Docker; localmente
-requiere el stack healthy y Chromium instalado. Los reportes quedan en `frontend/playwright-report/`.
+Playwright cubre 17 flujos con `E2E_BASE_URL` (por defecto `http://localhost:48124`) y la contraseña demo:
+administrador, residente, portería y plataforma; cambio de copropiedad; alta/baja de mascotas; junta directiva, citas,
+capacitaciones, personal operativo, expediente del inmueble y matriz de roles; y verificación responsive de las pantallas
+nuevas, incluido el desplazamiento del formulario de visitantes en portería móvil. En CI se ejecuta después de levantar
+Docker; localmente requiere el stack healthy y Chromium instalado. Los reportes quedan en `frontend/playwright-report/`.
 
 `mvn -B verify` genera `backend/target/site/jacoco/` y falla si la cobertura de líneas baja de 45%. La medición actual es
-53,17% de líneas, 42,37% de ramas y 58,16% de métodos.
+52,49% de líneas, 41,31% de ramas y 56,48% de métodos.
 
 ## Recorrido manual por pantalla
 
@@ -133,8 +138,13 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 | PQRS | `/app/pqrs` | Crear, responder, cambiar estado y revisar SLA |
 | Comunicados | `/app/comunicados` | Publicar comunicado y comprobar lectura del residente |
 | Notificaciones | `/app/notificaciones` | Revisar configuración y logs; WhatsApp está deshabilitado temporalmente |
-| Documentos | `/app/documentos` | Subir, listar, descargar y restringir por rol |
+| Documentos | `/app/documentos` | Subir, listar, descargar, restringir por rol y asociar a un inmueble |
 | Asambleas | `/app/asambleas` | Crear asamblea, agenda, asistencia, votación y acta |
+| Junta directiva | `/app/junta` | Registrar cargos, validar cargo único por persona y varios vocales, editar y eliminar |
+| Citas | `/app/citas` | Confirmar, reprogramar, completar, cancelar y eliminar citas; revisar notas |
+| Capacitaciones | `/app/capacitaciones` | Crear, editar, cancelar y eliminar capacitaciones; inscribir y marcar asistencia |
+| Personal operativo | `/app/personal` | Crear, editar, filtrar y eliminar personal; validar documento único |
+| Expedientes | `/app/expedientes` | Consultar el expediente, crear notas internas/públicas y asociar documentos |
 | Proveedores | `/app/proveedores` | Crear proveedor, contrato y póliza |
 | Mantenimiento | `/app/mantenimiento` | Crear activo, plan y orden de trabajo |
 | Presupuesto | `/app/presupuesto` | Crear presupuesto, rubros y consultar ejecución |
@@ -142,7 +152,7 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 | Reportes | `/app/reportes` | Generar reporte y exportar CSV/PDF |
 | Auditoría | `/app/auditoria` | Ver eventos de las acciones anteriores |
 | Usuarios | `/app/usuarios` | Invitar usuario, asignar rol y revocar acceso |
-| Roles | `/app/roles` | Revisar permisos por rol y su efecto en el menú |
+| Roles | `/app/roles` | Ver la matriz, buscar permisos, ajustar uno, restablecerlo, restablecer el rol completo y exportar CSV |
 | Configuración | `/app/configuracion` | Editar datos, activar/desactivar canales y revisar ajustes |
 
 ### Portería
@@ -153,6 +163,7 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 | Visitantes | `/app/porteria/visitantes` | Validar QR, registrar ingreso, crear visitante sin invitación y autorizar |
 | Paquetes | `/app/porteria/paquetes` | Recibir paquete y entregarlo; una segunda entrega debe fallar |
 | Novedades | `/app/porteria/novedades` | Registrar novedad y verla en administración |
+| Personal | `/app/personal` | Consultar el directorio operativo; no debe poder crear ni editar |
 
 ### Residente
 
@@ -170,6 +181,10 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 | Asambleas | `/app/residente/asambleas` | Registrar asistencia y votar |
 | Documentos | `/app/residente/documentos` | Descargar documentos permitidos |
 | Paquetes | `/app/residente/paquetes` | Ver paquetes recibidos/entregados |
+| Junta directiva | `/app/residente/junta` | Consultar los miembros activos de la junta |
+| Citas | `/app/residente/citas` | Solicitar una cita en horario hábil y cancelar una propia |
+| Capacitaciones | `/app/residente/capacitaciones` | Inscribirse, cancelar la inscripción y consultar el cupo |
+| Expediente | `/app/residente/expediente` | Consultar el expediente propio; las notas internas no deben aparecer |
 
 ### Plataforma
 
@@ -217,13 +232,16 @@ Base local: `http://localhost:48124`. Contraseña demo: `Demo#2026!`.
 5. Emitir un certificado, descargarlo y verificarlo desde la página pública.
 6. Subir un documento y comprobarlo desde el portal del residente.
 7. Crear una asamblea, registrar asistencia y votar.
-8. Generar una corrida de nómina, pagarla y exportar el CSV.
-9. Revisar auditoría y cerrar sesión.
+8. Registrar un miembro de junta, solicitar una cita, inscribirse a una capacitación y agregar una nota pública e interna
+   al expediente; comprobar qué ve el residente.
+9. Generar una corrida de nómina, pagarla y exportar el CSV.
+10. Revisar la matriz de roles, restablecer un permiso y exportar el CSV.
+11. Revisar auditoría y cerrar sesión.
 
 ## Verificación de producción
 
 Se validó un arranque limpio con `SPRING_PROFILES_ACTIVE=production`, PostgreSQL y Redis nuevos, sin seed: health `UP`,
-Flyway hasta `V12` global y `V9` por tenant, `/v3/api-docs` con `404`, cero tenants y usuarios.
+Flyway hasta `V17` global y `V16` por tenant, `/v3/api-docs` con `404`, cero tenants y usuarios.
 `ProductionConfigValidatorTest` cubre la aceptación de una configuración completa y el rechazo de URL insegura, seed,
 Swagger, CORS local, secretos débiles, secretos Wompi iguales, SMTP ausente, Wompi de pruebas, WhatsApp incompleto y
 storage efímero.

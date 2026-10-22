@@ -683,4 +683,206 @@ Check 'administrador elimina la mascota de prueba' ((Call DELETE "/pets/$($petAd
 $petGone = Call GET "/pets?q=SMOKE$runId" $admin
 Check 'mascota eliminada no aparece en el registro' ($petGone.Status -eq 200 -and $petGone.Json.totalElements -eq 0)
 
+Write-Host '25) Junta directiva'
+$board = Call GET '/board' $admin
+Check 'junta directiva demo (3 integrantes)' ($board.Status -eq 200 -and @($board.Json).Count -ge 3)
+$boardPresident = @($board.Json | Where-Object { $_.position -eq 'PRESIDENTE' })[0]
+$boardOriginalNotes = $boardPresident.notes
+if ($null -eq $boardOriginalNotes) { $boardOriginalNotes = '' }
+$boardStartDate = ([string]$boardPresident.startDate).Substring(0, 10)
+$boardUpd = Call PUT "/board/$($boardPresident.id)" $admin @{
+  personId = $boardPresident.personId
+  position = $boardPresident.position
+  startDate = $boardStartDate
+  endDate = $null
+  status = 'ACTIVE'
+  notes = "Nota de prueba $runId"
+}
+Check 'actualizacion de miembro de junta (200)' ($boardUpd.Status -eq 200 -and $boardUpd.Json.notes -eq "Nota de prueba $runId")
+$boardDup = Call POST '/board' $admin @{ personId = $boardPresident.personId; position = 'VOCAL'; startDate = (Get-Date).ToString('yyyy-MM-dd'); status = 'ACTIVE' }
+Check 'persona con cargo activo duplicado (409)' ($boardDup.Status -eq 409)
+$boardRestore = Call PUT "/board/$($boardPresident.id)" $admin @{
+  personId = $boardPresident.personId
+  position = $boardPresident.position
+  startDate = $boardStartDate
+  endDate = $null
+  status = 'ACTIVE'
+  notes = $boardOriginalNotes
+}
+Check 'nota original restaurada' ($boardRestore.Status -eq 200)
+Check 'propietario consulta la junta activa' (@((Call GET '/board?status=ACTIVE' $ot).Json).Count -ge 1)
+
+Write-Host '26) Citas con la administracion'
+$apptAdmin = Call GET '/appointments?size=5' $admin
+Check 'agenda administrativa consultada' ($apptAdmin.Status -eq 200 -and $apptAdmin.Json.totalElements -ge 1)
+$apptMine = Call GET '/my/appointments' $ot
+Check 'propietario consulta sus citas' ($apptMine.Status -eq 200 -and @($apptMine.Json).Count -ge 1)
+$apptDay = (Get-Date).AddDays(20 + (Get-Random -Maximum 25)).Date.AddHours(10).AddMinutes(30)
+while ($apptDay.DayOfWeek -eq 'Saturday' -or $apptDay.DayOfWeek -eq 'Sunday') { $apptDay = $apptDay.AddDays(1) }
+$apptStart = $apptDay.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+$apptBody = @{
+  unitId = $unit101
+  subject = "Cita de prueba $runId"
+  reason = 'Solicitud creada por la prueba de humo para validar la agenda.'
+  scheduledAt = $apptStart
+  durationMinutes = 30
+  modality = 'VIRTUAL'
+  meetingLink = 'https://meet.example.com/cita-smoke'
+}
+$apptNew = Call POST '/my/appointments' $ot $apptBody
+Check 'solicitud de cita (201, REQUESTED)' ($apptNew.Status -eq 201 -and $apptNew.Json.status -eq 'REQUESTED')
+$apptId = $apptNew.Json.id
+$apptDup = Call POST '/my/appointments' $ot $apptBody
+Check 'horario ocupado rechazado (409)' ($apptDup.Status -eq 409 -and $apptDup.Json.code -eq 'APPOINTMENT_SLOT_TAKEN')
+$apptConfirm = Call PUT "/appointments/$apptId" $admin @{ status = 'CONFIRMED' }
+Check 'administracion confirma la cita (200, CONFIRMED)' ($apptConfirm.Status -eq 200 -and $apptConfirm.Json.status -eq 'CONFIRMED')
+$apptCancel = Call POST "/my/appointments/$apptId/cancel" $ot @{ reason = 'Cancelacion de prueba de humo' }
+Check 'propietario cancela la cita (204)' ($apptCancel.Status -eq 204)
+$apptAfter = Call GET '/my/appointments' $ot
+$apptCancelled = @($apptAfter.Json | Where-Object { $_.id -eq $apptId })[0]
+Check 'cita cancelada visible para el propietario' ($apptCancelled.status -eq 'CANCELLED')
+Check 'eliminacion de cita de prueba (204)' ((Call DELETE "/appointments/$apptId" $admin).Status -eq 204)
+$saturday = (Get-Date).Date.AddDays(1)
+while ($saturday.DayOfWeek -ne 'Saturday') { $saturday = $saturday.AddDays(1) }
+$apptWeekend = Call POST '/my/appointments' $ot @{
+  unitId = $unit101
+  subject = "Cita fin de semana $runId"
+  reason = 'Validacion de horario no permitido.'
+  scheduledAt = $saturday.AddHours(10).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+  durationMinutes = 30
+  modality = 'IN_PERSON'
+}
+Check 'cita en sabado rechazada (400)' ($apptWeekend.Status -eq 400 -and $apptWeekend.Json.code -eq 'APPOINTMENT_OUTSIDE_HOURS')
+
+Write-Host '27) Capacitaciones comunitarias'
+$trainingList = Call GET '/trainings?size=10' $admin
+Check 'capacitaciones demo consultadas' ($trainingList.Status -eq 200 -and $trainingList.Json.totalElements -ge 1)
+$trainingDay = (Get-Date).AddDays(35).Date.AddHours(9)
+while ($trainingDay.DayOfWeek -eq 'Saturday' -or $trainingDay.DayOfWeek -eq 'Sunday') { $trainingDay = $trainingDay.AddDays(1) }
+$trainingNew = Call POST '/trainings' $admin @{
+  title = "Capacitacion smoke $runId"
+  description = 'Taller de prueba para validar inscripciones, cupos y asistencia.'
+  trainerName = 'Facilitador de prueba'
+  modality = 'HYBRID'
+  location = 'Salon comunal'
+  meetingLink = 'https://meet.example.com/capacitacion-smoke'
+  startsAt = $trainingDay.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+  endsAt = $trainingDay.AddHours(2).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+  capacity = 10
+}
+Check 'capacitacion creada (201)' ($trainingNew.Status -eq 201 -and $trainingNew.Json.id)
+$trainingId = $trainingNew.Json.id
+$trainingMine = @((Call GET '/my/trainings' $ot).Json | Where-Object { $_.session.id -eq $trainingId })[0]
+Check 'capacitacion visible para el propietario' ($trainingMine.session.id -eq $trainingId)
+$enroll = Call POST "/my/trainings/$trainingId/enroll" $ot
+Check 'propietario se inscribe (200, cupo 1)' ($enroll.Status -eq 200 -and $enroll.Json.enrolledCount -eq 1)
+$enrollDup = Call POST "/my/trainings/$trainingId/enroll" $ot
+Check 'inscripcion duplicada rechazada (409)' ($enrollDup.Status -eq 409 -and $enrollDup.Json.code -eq 'TRAINING_ALREADY_ENROLLED')
+$enrollments = Call GET "/trainings/$trainingId/enrollments" $admin
+Check 'administracion consulta inscripciones' ($enrollments.Status -eq 200 -and @($enrollments.Json).Count -eq 1)
+$enrollmentId = @($enrollments.Json)[0].id
+Check 'propietario cancela su inscripcion (204)' ((Call DELETE "/my/trainings/$trainingId/enroll" $ot).Status -eq 204)
+Check 'propietario se vuelve a inscribir (200)' ((Call POST "/my/trainings/$trainingId/enroll" $ot).Status -eq 200)
+$attendance = Call PUT "/trainings/enrollments/$enrollmentId" $admin @{ status = 'ATTENDED' }
+Check 'asistencia registrada (ATTENDED)' ($attendance.Status -eq 200 -and $attendance.Json.status -eq 'ATTENDED')
+$attendanceAbsent = Call PUT "/trainings/enrollments/$enrollmentId" $admin @{ status = 'ABSENT' }
+Check 'asistencia corregida (ABSENT)' ($attendanceAbsent.Status -eq 200 -and $attendanceAbsent.Json.status -eq 'ABSENT')
+Check 'cancelacion de la capacitacion (204)' ((Call POST "/trainings/$trainingId/cancel" $admin).Status -eq 204)
+Check 'eliminacion de la capacitacion de prueba (204)' ((Call DELETE "/trainings/$trainingId" $admin).Status -eq 204)
+Check 'propietario no administra capacitaciones (403)' ((Call POST '/trainings' $ot @{ title = 'No permitido'; startsAt = $trainingDay.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); endsAt = $trainingDay.AddHours(1).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); capacity = 5 }).Status -eq 403)
+
+Write-Host '28) Personal operativo'
+$staffList = Call GET '/staff?size=10' $admin
+Check 'directorio de personal demo' ($staffList.Status -eq 200 -and $staffList.Json.totalElements -ge 1)
+$staffNew = Call POST '/staff' $admin @{
+  fullName = "Persona Smoke $runId"
+  documentType = 'CC'
+  documentNumber = "SMOKE-$runId"
+  position = 'Auxiliar de servicios'
+  area = 'Servicios generales'
+  phone = '+57 300 000 0000'
+  email = "smoke-$runId@demo.local"
+  shift = 'Lunes a viernes'
+  startDate = (Get-Date).ToString('yyyy-MM-dd')
+  status = 'ACTIVE'
+}
+Check 'personal registrado (201)' ($staffNew.Status -eq 201 -and $staffNew.Json.id)
+$staffId = $staffNew.Json.id
+$staffUpd = Call PUT "/staff/$staffId" $admin @{
+  fullName = "Persona Smoke Actualizada $runId"
+  documentType = 'CC'
+  documentNumber = "SMOKE-$runId"
+  position = 'Auxiliar de servicios'
+  area = 'Servicios generales'
+  phone = '+57 300 111 1111'
+  email = "smoke-$runId@demo.local"
+  shift = 'Lunes a sabado'
+  startDate = (Get-Date).ToString('yyyy-MM-dd')
+  status = 'ACTIVE'
+}
+Check 'personal actualizado (200)' ($staffUpd.Status -eq 200 -and $staffUpd.Json.fullName -like '*Actualizada*')
+$staffDup = Call POST '/staff' $admin @{ fullName = 'Documento duplicado'; documentType = 'CC'; documentNumber = "SMOKE-$runId"; position = 'Auxiliar'; startDate = (Get-Date).ToString('yyyy-MM-dd') }
+Check 'documento de personal duplicado (409)' ($staffDup.Status -eq 409)
+Check 'portero consulta personal (200)' ((Call GET '/staff?size=5' $guard).Status -eq 200)
+Check 'portero no administra personal (403)' ((Call POST '/staff' $guard @{ fullName = 'No permitido'; documentNumber = 'NO'; position = 'Ninguno'; startDate = (Get-Date).ToString('yyyy-MM-dd') }).Status -eq 403)
+Check 'personal de prueba eliminado (204)' ((Call DELETE "/staff/$staffId" $admin).Status -eq 204)
+
+Write-Host '29) Expediente del inmueble'
+$unitFile = Call GET "/properties/$unit101/file" $admin
+Check 'expediente consultado (200, relaciones y notas)' ($unitFile.Status -eq 200 -and @($unitFile.Json.relations).Count -ge 1 -and @($unitFile.Json.notes).Count -ge 1)
+$noteNew = Call POST "/properties/$unit101/notes" $admin @{
+  title = "Nota interna smoke $runId"
+  body = 'Seguimiento interno creado por la prueba de humo.'
+  internal = $true
+}
+Check 'nota interna creada (201)' ($noteNew.Status -eq 201 -and $noteNew.Json.internal -eq $true)
+$noteId = $noteNew.Json.id
+$ownerFileInternal = Call GET "/my/units/$unit101/file" $ot
+Check 'residente no ve la nota interna' (@($ownerFileInternal.Json.notes | Where-Object { $_.id -eq $noteId }).Count -eq 0)
+$noteUpd = Call PUT "/properties/$unit101/notes/$noteId" $admin @{
+  title = "Nota publica smoke $runId"
+  body = 'Nota convertida en publica para validar la visibilidad del residente.'
+  internal = $false
+}
+Check 'nota convertida en publica (200)' ($noteUpd.Status -eq 200 -and $noteUpd.Json.internal -eq $false)
+$ownerFilePublic = Call GET "/my/units/$unit101/file" $ot
+Check 'residente ve la nota publica' (@($ownerFilePublic.Json.notes | Where-Object { $_.id -eq $noteId }).Count -eq 1)
+Check 'residente no crea notas (403)' ((Call POST "/properties/$unit101/notes" $ot @{ title = 'No permitido'; body = 'No permitido'; internal = $false }).Status -eq 403)
+$unitDocTmp = Join-Path $env:TEMP "expediente-smoke-$runId.txt"
+"DOCUMENTO DEL EXPEDIENTE $runId" | Out-File -FilePath $unitDocTmp -Encoding utf8
+$unitDoc = & curl.exe -s -F "file=@$unitDocTmp" -F "title=Documento expediente $runId" -F "category=OTRO" -F "minimumRole=RESIDENTE" -F "unitId=$unit101" -H "Authorization: Bearer $admin" "$base/documents" | ConvertFrom-Json
+Check 'documento asociado al inmueble (201)' ($unitDoc.id -and $unitDoc.unitId -eq $unit101)
+$unitFileWithDoc = Call GET "/properties/$unit101/file" $admin
+Check 'documento aparece en el expediente' (@($unitFileWithDoc.Json.documents | Where-Object { $_.id -eq $unitDoc.id }).Count -eq 1)
+$ownerFileWithDoc = Call GET "/my/units/$unit101/file" $ot
+Check 'propietario ve el documento del inmueble' (@($ownerFileWithDoc.Json.documents | Where-Object { $_.id -eq $unitDoc.id }).Count -eq 1)
+$unitDocDown = Invoke-WebRequest -Uri "$base/my/documents/$($unitDoc.id)/download" -Headers @{ Authorization = "Bearer $ot" } -UseBasicParsing
+Check 'propietario descarga el documento del expediente' ($unitDocDown.StatusCode -eq 200 -and $unitDocDown.Content -like '*EXPEDIENTE*')
+Check 'eliminacion del documento de prueba (204)' ((Call DELETE "/documents/$($unitDoc.id)" $admin).Status -eq 204)
+Check 'eliminacion de la nota de prueba (204)' ((Call DELETE "/properties/$unit101/notes/$noteId" $admin).Status -eq 204)
+Remove-Item $unitDocTmp -ErrorAction SilentlyContinue
+$myUnitIds = @($mine.Json | ForEach-Object { $_.unitId })
+$otherUnit = @((Call GET '/properties?size=200' $admin).Json.content | Where-Object { $myUnitIds -notcontains $_.id })[0].id
+Check 'propietario no consulta expediente ajeno (403)' ((Call GET "/properties/$otherUnit/file" $ot).Status -eq 403)
+Check 'portero no consulta expedientes (403)' ((Call GET "/properties/$unit101/file" $guard).Status -eq 403)
+
+Write-Host '30) Matriz de roles y permisos'
+$roles = Call GET '/roles' $admin
+$permissionCatalog = Call GET '/roles/permissions' $admin
+Check 'roles de la copropiedad consultados' ($roles.Status -eq 200 -and @($roles.Json).Count -ge 10)
+Check 'catalogo de permisos consultado (97)' ($permissionCatalog.Status -eq 200 -and @($permissionCatalog.Json).Count -ge 90)
+$residentRole = @($roles.Json | Where-Object { $_.role -eq 'RESIDENTE' })[0]
+Check 'residente tiene BOARD_VIEW base' (@($residentRole.permissions) -contains 'BOARD_VIEW')
+$revoke = Call PUT '/roles/RESIDENTE/permissions/BOARD_VIEW' $admin @{ granted = $false }
+Check 'permiso retirado en la matriz (200)' ($revoke.Status -eq 200 -and @($revoke.Json.permissions) -notcontains 'BOARD_VIEW')
+$resetOne = Call DELETE '/roles/RESIDENTE/permissions/BOARD_VIEW' $admin
+Check 'permiso restablecido a su valor base' ($resetOne.Status -eq 200 -and @($resetOne.Json.permissions) -contains 'BOARD_VIEW')
+$revokeAll = Call PUT '/roles/RESIDENTE/permissions/BOARD_VIEW' $admin @{ granted = $false }
+Check 'permiso retirado para restablecer rol' ($revokeAll.Status -eq 200)
+$resetRole = Call DELETE '/roles/RESIDENTE/permissions' $admin
+Check 'todos los permisos del rol restablecidos' ($resetRole.Status -eq 200 -and @($resetRole.Json.permissions) -contains 'BOARD_VIEW')
+$adminReset = Call DELETE '/roles/ADMINISTRADOR/permissions' $admin
+Check 'rol administrador no se puede restablecer (409)' ($adminReset.Status -eq 409)
+Check 'propietario no administra roles (403)' ((Call GET '/roles' $ot).Status -eq 403)
+
 if ($fails -eq 0) { Write-Host 'TODO OK' -ForegroundColor Green } else { Write-Host "HAY $fails FALLOS" -ForegroundColor Red; exit 1 }

@@ -3,6 +3,7 @@ package com.codevam.vecindad.documents.application;
 import com.codevam.vecindad.documents.application.port.out.DocumentPort;
 import com.codevam.vecindad.documents.domain.Document;
 import com.codevam.vecindad.documents.domain.DocumentCategory;
+import com.codevam.vecindad.people.application.port.out.UnitRelationPort;
 import com.codevam.vecindad.shared.error.ApiException;
 import com.codevam.vecindad.shared.tenancy.TenantContext;
 import com.codevam.vecindad.storage.StoragePort;
@@ -51,19 +52,29 @@ public class DocumentService {
 
     private final DocumentPort port;
     private final StoragePort storage;
+    private final UnitRelationPort relations;
 
-    public DocumentService(DocumentPort port, StoragePort storage) {
+    public DocumentService(DocumentPort port, StoragePort storage, UnitRelationPort relations) {
         this.port = port;
         this.storage = storage;
+        this.relations = relations;
     }
 
     public List<Document> listAll(DocumentCategory category) {
         return port.listAll(category);
     }
 
+    public List<Document> listByUnit(UUID unitId, DocumentCategory category) {
+        return port.listByUnit(unitId, category);
+    }
+
     public List<Document> listForRole(String roleCode, DocumentCategory category) {
         List<String> accessibleRoles = getAccessibleRoles(roleCode);
         return port.listVisibleForRole(accessibleRoles, category);
+    }
+
+    public List<Document> listForRoleByUnit(String roleCode, UUID unitId) {
+        return port.listVisibleForRoleByUnit(getAccessibleRoles(roleCode), unitId);
     }
 
     public Document getById(UUID id) {
@@ -74,6 +85,12 @@ public class DocumentService {
     @Transactional
     public Document upload(UUID uploadedBy, String title, String description, DocumentCategory category,
                            String minimumRole, String fileName, String contentType, byte[] data) {
+        return upload(uploadedBy, title, description, category, minimumRole, fileName, contentType, null, data);
+    }
+
+    @Transactional
+    public Document upload(UUID uploadedBy, String title, String description, DocumentCategory category,
+                           String minimumRole, String fileName, String contentType, UUID unitId, byte[] data) {
         String safeTitle = validateTitle(title);
         String safeDescription = validateDescription(description);
         if (category == null) {
@@ -97,6 +114,7 @@ public class DocumentService {
                     safeTitle,
                     safeDescription,
                     category,
+                    unitId,
                     storageKey,
                     safeFileName,
                     data.length,
@@ -120,6 +138,22 @@ public class DocumentService {
         if (!canAccess(roleCode, doc.minimumRole())) {
             throw ApiException.forbidden("DOCUMENT_ACCESS_DENIED", "No tienes permisos suficientes para acceder a este documento.");
         }
+        return readFile(doc);
+    }
+
+    public DocumentFile downloadForUser(UUID id, String roleCode, UUID userId) {
+        Document doc = getById(id);
+        if (!canAccess(roleCode, doc.minimumRole())) {
+            throw ApiException.forbidden("DOCUMENT_ACCESS_DENIED", "No tienes permisos suficientes para acceder a este documento.");
+        }
+        if (doc.unitId() != null && !relations.userHasUnit(userId, doc.unitId())) {
+            throw ApiException.forbidden("DOCUMENT_ACCESS_DENIED",
+                    "No tienes acceso al expediente del inmueble asociado a este documento.");
+        }
+        return readFile(doc);
+    }
+
+    private DocumentFile readFile(Document doc) {
         byte[] data = storage.load(doc.storageKey());
         String extension = extensionOf(doc.fileName());
         String contentType = SAFE_CONTENT_TYPES.getOrDefault(extension, "application/octet-stream");

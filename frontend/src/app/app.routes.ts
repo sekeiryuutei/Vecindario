@@ -65,6 +65,31 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/admin/pets.page').then((m) => m.PetsPage)
       },
       {
+        path: 'junta',
+        canActivate: [permissionGuard('BOARD_VIEW')],
+        loadComponent: () => import('./pages/admin/board.page').then((m) => m.BoardPage)
+      },
+      {
+        path: 'citas',
+        canActivate: [permissionGuard('APPOINTMENTS_VIEW', 'APPOINTMENTS_MANAGE')],
+        loadComponent: () => import('./pages/admin/appointments.page').then((m) => m.AppointmentsPage)
+      },
+      {
+        path: 'capacitaciones',
+        canActivate: [permissionGuard('TRAININGS_VIEW', 'TRAININGS_MANAGE')],
+        loadComponent: () => import('./pages/admin/trainings.page').then((m) => m.TrainingsPage)
+      },
+      {
+        path: 'personal',
+        canActivate: [permissionGuard('STAFF_VIEW')],
+        loadComponent: () => import('./pages/admin/staff.page').then((m) => m.StaffPage)
+      },
+      {
+        path: 'expedientes',
+        canActivate: [permissionGuard('UNIT_FILE_VIEW')],
+        loadComponent: () => import('./pages/admin/unit-file.page').then((m) => m.UnitFilePage)
+      },
+      {
         path: 'cartera',
         canActivate: [permissionGuard('FINANCE_VIEW')],
         loadComponent: () => import('./pages/admin/finance.page').then((m) => m.FinancePage)
@@ -207,6 +232,26 @@ export const routes: Routes = [
             path: 'mascotas',
             canActivate: [permissionGuard('PETS_VIEW_OWN')],
             loadComponent: () => import('./pages/resident/my-pets.page').then((m) => m.MyPetsPage)
+          },
+          {
+            path: 'junta',
+            canActivate: [permissionGuard('BOARD_VIEW')],
+            loadComponent: () => import('./pages/resident/my-board.page').then((m) => m.MyBoardPage)
+          },
+          {
+            path: 'citas',
+            canActivate: [permissionGuard('APPOINTMENTS_VIEW_OWN')],
+            loadComponent: () => import('./pages/resident/my-appointments.page').then((m) => m.MyAppointmentsPage)
+          },
+          {
+            path: 'capacitaciones',
+            canActivate: [permissionGuard('TRAININGS_VIEW_OWN')],
+            loadComponent: () => import('./pages/resident/my-trainings.page').then((m) => m.MyTrainingsPage)
+          },
+          {
+            path: 'expediente',
+            canActivate: [permissionGuard('UNIT_FILE_VIEW_OWN')],
+            loadComponent: () => import('./pages/resident/my-unit-file.page').then((m) => m.MyUnitFilePage)
           },
           {
             path: 'estado-cuenta',

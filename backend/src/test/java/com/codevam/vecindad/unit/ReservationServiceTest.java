@@ -11,7 +11,9 @@ import org.mockito.Mockito;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -91,6 +93,20 @@ class ReservationServiceTest {
 
         ApiException ex = assertThrows(ApiException.class, () -> service.createReservation(userId, cmd));
         assertEquals("SLOT_ALREADY_RESERVED", ex.getCode());
+    }
+
+    @Test
+    void rejectsReservationThatCrossesMidnight() {
+        ZonedDateTime start = LocalDate.now(ReservationService.BOGOTA).plusDays(2)
+                .atTime(23, 0).atZone(ReservationService.BOGOTA);
+
+        var cmd = new ReservationService.CreateReservationCommand(
+                areaId, unitId, null, start.toInstant(), start.plusHours(2).toInstant(),
+                PaymentMethod.CASH, null, "Evento nocturno"
+        );
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.createReservation(userId, cmd));
+        assertEquals("OUTSIDE_OPERATING_HOURS", ex.getCode());
     }
 
     @Test

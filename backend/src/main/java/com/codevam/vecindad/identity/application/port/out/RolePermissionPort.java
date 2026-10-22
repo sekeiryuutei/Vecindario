@@ -10,4 +10,5 @@ public interface RolePermissionPort {
     boolean permissionExists(String code);
     void setOverride(String tenantSchema, String roleCode, String permissionCode, boolean granted, UUID actor);
     void clearOverride(String tenantSchema, String roleCode, String permissionCode);
+    void clearOverrides(String tenantSchema, String roleCode);
 }

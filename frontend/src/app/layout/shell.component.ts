@@ -131,6 +131,7 @@ export class ShellComponent {
         { label: 'Resumen', path: '/app/inicio', icon: 'homeOutline' },
         { label: 'Control de acceso', path: '/app/porteria/control', icon: 'carOutline', permissions: ['VEHICLES_VIEW'] },
         { label: 'Mascotas', path: '/app/mascotas', icon: 'pawOutline', permissions: ['PETS_VIEW'] },
+        { label: 'Personal', path: '/app/personal', icon: 'idCardOutline', permissions: ['STAFF_VIEW'] },
         { label: 'Visitantes', path: '/app/porteria/visitantes', icon: 'peopleOutline', permissions: ['VISITORS_VIEW'] },
         { label: 'Paquetería', path: '/app/porteria/paquetes', icon: 'cubeOutline', permissions: ['PACKAGES_VIEW'] },
         { label: 'Novedades', path: '/app/porteria/novedades', icon: 'alertCircleOutline', permissions: ['INCIDENTS_VIEW'] }
@@ -145,12 +146,16 @@ export class ShellComponent {
         { label: 'Mis inmuebles', path: '/app/residente/inmuebles', icon: 'businessOutline', permissions: ['UNITS_VIEW_OWN'] },
         { label: 'Mis vehículos', path: '/app/residente/vehiculos', icon: 'carOutline', permissions: ['VEHICLES_VIEW_OWN'] },
         { label: 'Mis mascotas', path: '/app/residente/mascotas', icon: 'pawOutline', permissions: ['PETS_VIEW_OWN'] },
+        { label: 'Junta directiva', path: '/app/residente/junta', icon: 'peopleCircleOutline', permissions: ['BOARD_VIEW'] },
+        { label: 'Expediente del inmueble', path: '/app/residente/expediente', icon: 'folderOpenOutline', permissions: ['UNIT_FILE_VIEW_OWN'] },
         { label: 'Estado de cuenta', path: '/app/residente/estado-cuenta', icon: 'walletOutline', permissions: ['FINANCE_VIEW_OWN'] },
         { label: 'Certificados', path: '/app/residente/certificados', icon: 'ribbonOutline', permissions: ['CERTIFICATES_VIEW_OWN'] }
       ], this.auth);
       pushFiltered(residentSections, 'Convivencia', [
         { label: 'Visitas e invitaciones', path: '/app/residente/visitas', icon: 'peopleOutline', permissions: ['VISITORS_VIEW_OWN'] },
         { label: 'Reservas', path: '/app/residente/reservas', icon: 'calendarOutline', permissions: ['RESERVATIONS_VIEW_OWN'] },
+        { label: 'Citas con administración', path: '/app/residente/citas', icon: 'calendarNumberOutline', permissions: ['APPOINTMENTS_VIEW_OWN'] },
+        { label: 'Capacitaciones', path: '/app/residente/capacitaciones', icon: 'schoolOutline', permissions: ['TRAININGS_VIEW_OWN'] },
         { label: 'PQRS', path: '/app/residente/pqrs', icon: 'chatbubblesOutline', permissions: ['PQR_VIEW_OWN'] },
         { label: 'Comunicados', path: '/app/residente/comunicados', icon: 'megaphoneOutline', permissions: ['COMMUNICATIONS_VIEW'] },
         { label: 'Asambleas', path: '/app/residente/asambleas', icon: 'podiumOutline', permissions: ['ASSEMBLIES_VIEW'] }
@@ -174,6 +179,11 @@ export class ShellComponent {
       { label: 'Personas', path: '/app/personas', icon: 'peopleOutline', permissions: ['RESIDENTES_VIEW'] },
       { label: 'Vehículos', path: '/app/vehiculos', icon: 'carOutline', permissions: ['VEHICLES_VIEW'] },
       { label: 'Mascotas', path: '/app/mascotas', icon: 'pawOutline', permissions: ['PETS_VIEW'] },
+      { label: 'Junta directiva', path: '/app/junta', icon: 'peopleCircleOutline', permissions: ['BOARD_VIEW'] },
+      { label: 'Citas', path: '/app/citas', icon: 'calendarNumberOutline', permissions: ['APPOINTMENTS_VIEW', 'APPOINTMENTS_MANAGE'] },
+      { label: 'Capacitaciones', path: '/app/capacitaciones', icon: 'schoolOutline', permissions: ['TRAININGS_VIEW', 'TRAININGS_MANAGE'] },
+      { label: 'Personal operativo', path: '/app/personal', icon: 'idCardOutline', permissions: ['STAFF_VIEW'] },
+      { label: 'Expedientes de inmuebles', path: '/app/expedientes', icon: 'folderOpenOutline', permissions: ['UNIT_FILE_VIEW'] },
       { label: 'Reservas y zonas', path: '/app/reservas', icon: 'calendarOutline', permissions: ['RESERVATIONS_VIEW', 'COMMON_AREAS_MANAGE'] },
       { label: 'PQRS', path: '/app/pqrs', icon: 'chatbubblesOutline', permissions: ['PQR_VIEW'] },
       { label: 'Comunicados', path: '/app/comunicados', icon: 'megaphoneOutline', permissions: ['COMMUNICATIONS_VIEW', 'COMMUNICATIONS_MANAGE'] }

@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -7,7 +8,7 @@ import { AuthService } from '../../core/auth.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { FileSizePipe } from '../../core/format.pipes';
 import { label } from '../../core/labels';
-import { Document } from '../../core/models';
+import { Document, PageResultPropertyUnit, PropertyUnit } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { describeError } from '../../core/utils';
 import { EmptyStateComponent, ModalComponent, PageHeaderComponent } from '../../shared/ui.components';
@@ -31,8 +32,15 @@ type DocumentCategory = NonNullable<Document['category']>;
           @for (option of categories; track option) { <option [value]="option">{{ label(option) }}</option> }
         </select>
       </div>
+      <div class="field">
+        <label for="documentUnit">Inmueble</label>
+        <select id="documentUnit" name="documentUnit" class="select" [(ngModel)]="unitFilter" (change)="load()">
+          <option value="">Todos</option>
+          @for (unit of units(); track unit.id) { <option [value]="unit.id">{{ unit.identifier }} — {{ unit.tower || 'Sin torre' }}</option> }
+        </select>
+      </div>
       <button type="button" class="btn btn-secondary" (click)="load()">Filtrar</button>
-      <button type="button" class="btn btn-ghost" (click)="category = ''; load()">Limpiar</button>
+      <button type="button" class="btn btn-ghost" (click)="category = ''; unitFilter = ''; load()">Limpiar</button>
     </div>
 
     <div class="card">
@@ -91,6 +99,13 @@ type DocumentCategory = NonNullable<Document['category']>;
             </select>
           </div>
           <div class="field span-2">
+            <label for="uploadUnit">Inmueble asociado (opcional)</label>
+            <select id="uploadUnit" name="uploadUnit" class="select" [(ngModel)]="form.unitId">
+              <option value="">Documento general de la copropiedad</option>
+              @for (unit of units(); track unit.id) { <option [value]="unit.id">{{ unit.identifier }} — {{ unit.tower || 'Sin torre' }}</option> }
+            </select>
+          </div>
+          <div class="field span-2">
             <label for="file">Archivo *</label>
             <input id="file" name="file" type="file" class="input" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.pptx,.csv,.txt" (change)="onFile($event)">
             <span class="hint">Máximo 5 MB. Formatos: PDF, imágenes, Office, CSV o texto.</span>
@@ -109,7 +124,9 @@ export class DocumentsPage {
   private readonly api = inject(ApiService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
   readonly label = label;
+  readonly units = signal<PropertyUnit[]>([]);
   readonly categories: DocumentCategory[] = ['ACTA_ASAMBLEA', 'ESTADO_FINANCIERO', 'REGLAMENTO_PROPIEDAD_HORIZONTAL', 'PRESUPUESTO', 'CONTRATO', 'CIRCULAR', 'OTRO'];
   readonly items = signal<Document[]>([]);
   readonly loading = signal(false);
@@ -117,29 +134,42 @@ export class DocumentsPage {
   readonly uploading = signal(false);
   readonly error = signal('');
   category = '';
+  unitFilter = '';
   file: File | null = null;
   form = {
     title: '',
     description: '',
     category: 'CIRCULAR' as DocumentCategory,
-    minimumRole: 'RESIDENTE'
+    minimumRole: 'RESIDENTE',
+    unitId: ''
   };
 
   constructor() {
+    this.unitFilter = this.route.snapshot.queryParamMap.get('unitId') ?? '';
+    void this.loadUnits();
     void this.load();
+  }
+
+  async loadUnits(): Promise<void> {
+    try {
+      const result = await firstValueFrom(this.api.get<PageResultPropertyUnit>('/properties', { size: 200 }));
+      this.units.set(result.content ?? []);
+    } catch {
+      this.units.set([]);
+    }
   }
 
   async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.items.set(await firstValueFrom(this.api.get<Document[]>('/documents', { category: this.category })));
+      this.items.set(await firstValueFrom(this.api.get<Document[]>('/documents', { category: this.category, unitId: this.unitFilter })));
     } finally {
       this.loading.set(false);
     }
   }
 
   openUpload(): void {
-    this.form = { title: '', description: '', category: 'CIRCULAR', minimumRole: 'RESIDENTE' };
+    this.form = { title: '', description: '', category: 'CIRCULAR', minimumRole: 'RESIDENTE', unitId: this.unitFilter };
     this.file = null;
     this.error.set('');
     this.uploadOpen.set(true);
@@ -162,7 +192,8 @@ export class DocumentsPage {
         title: this.form.title.trim(),
         description: this.form.description.trim(),
         category: this.form.category,
-        minimumRole: this.form.minimumRole
+        minimumRole: this.form.minimumRole,
+        unitId: this.form.unitId
       }));
       this.toast.success('Documento publicado.');
       this.uploadOpen.set(false);

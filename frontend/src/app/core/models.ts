@@ -896,6 +896,7 @@ export interface Document {
   title?: string;
   description?: string;
   category?: "ACTA_ASAMBLEA" | "ESTADO_FINANCIERO" | "REGLAMENTO_PROPIEDAD_HORIZONTAL" | "PRESUPUESTO" | "CONTRATO" | "CIRCULAR" | "OTRO";
+  unitId?: string;
   storageKey?: string;
   fileName?: string;
   fileSize?: number;
@@ -1953,4 +1954,218 @@ export interface PageResultPayrollRun {
   size?: number;
   totalElements?: number;
   totalPages?: number;
+}
+
+// Junta directiva
+export type BoardPosition = "PRESIDENTE" | "VICEPRESIDENTE" | "SECRETARIO" | "TESORERO" | "VOCAL" | "REVISOR_FISCAL";
+export type BoardStatus = "ACTIVE" | "INACTIVE";
+
+export interface BoardMemberRequest {
+  personId: string;
+  position: BoardPosition;
+  startDate?: string;
+  endDate?: string;
+  status?: BoardStatus;
+  notes?: string;
+}
+
+export interface BoardMember {
+  id?: string;
+  personId?: string;
+  personName?: string;
+  documentNumber?: string;
+  email?: string;
+  phone?: string;
+  position?: BoardPosition;
+  startDate?: string;
+  endDate?: string;
+  status?: BoardStatus;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Citas con la administración
+export type AppointmentStatus = "REQUESTED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
+export type AppointmentModality = "IN_PERSON" | "VIRTUAL" | "PHONE";
+
+export interface AppointmentRequest {
+  unitId: string;
+  subject: string;
+  reason: string;
+  scheduledAt: string;
+  durationMinutes?: number;
+  modality?: AppointmentModality;
+  location?: string;
+  meetingLink?: string;
+}
+
+export interface AppointmentUpdateRequest {
+  subject?: string;
+  reason?: string;
+  scheduledAt?: string;
+  durationMinutes?: number;
+  modality?: AppointmentModality;
+  location?: string;
+  meetingLink?: string;
+  status?: AppointmentStatus;
+  adminNotes?: string;
+}
+
+export interface Appointment {
+  id?: string;
+  unitId?: string;
+  unitIdentifier?: string;
+  personId?: string;
+  personName?: string;
+  subject?: string;
+  reason?: string;
+  scheduledAt?: string;
+  durationMinutes?: number;
+  modality?: AppointmentModality;
+  location?: string;
+  meetingLink?: string;
+  status?: AppointmentStatus;
+  adminNotes?: string;
+  cancellationReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PageResultAppointment {
+  content?: Appointment[];
+  page?: number;
+  size?: number;
+  totalElements?: number;
+  totalPages?: number;
+}
+
+// Capacitaciones comunitarias
+export type TrainingModality = "IN_PERSON" | "VIRTUAL" | "HYBRID";
+export type TrainingStatus = "SCHEDULED" | "CANCELLED" | "COMPLETED";
+export type EnrollmentStatus = "ENROLLED" | "ATTENDED" | "ABSENT" | "CANCELLED";
+
+export interface TrainingRequest {
+  title: string;
+  description?: string;
+  trainerName?: string;
+  modality?: TrainingModality;
+  location?: string;
+  meetingLink?: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+}
+
+export interface TrainingSession {
+  id?: string;
+  title?: string;
+  description?: string;
+  trainerName?: string;
+  modality?: TrainingModality;
+  location?: string;
+  meetingLink?: string;
+  startsAt?: string;
+  endsAt?: string;
+  capacity?: number;
+  status?: TrainingStatus;
+  enrolledCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TrainingEnrollment {
+  id?: string;
+  sessionId?: string;
+  personId?: string;
+  personName?: string;
+  unitId?: string;
+  unitIdentifier?: string;
+  status?: EnrollmentStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MyTraining {
+  session?: TrainingSession;
+  enrollmentStatus?: EnrollmentStatus;
+}
+
+export interface PageResultTrainingSession {
+  content?: TrainingSession[];
+  page?: number;
+  size?: number;
+  totalElements?: number;
+  totalPages?: number;
+}
+
+// Personal operativo
+export type StaffStatus = "ACTIVE" | "INACTIVE";
+
+export interface StaffRequest {
+  fullName: string;
+  documentType?: string;
+  documentNumber: string;
+  position: string;
+  area?: string;
+  phone?: string;
+  email?: string;
+  shift?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: StaffStatus;
+  notes?: string;
+}
+
+export interface StaffMember {
+  id?: string;
+  fullName?: string;
+  documentType?: string;
+  documentNumber?: string;
+  position?: string;
+  area?: string;
+  phone?: string;
+  email?: string;
+  shift?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: StaffStatus;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PageResultStaffMember {
+  content?: StaffMember[];
+  page?: number;
+  size?: number;
+  totalElements?: number;
+  totalPages?: number;
+}
+
+// Expediente del inmueble
+export interface UnitFileNoteRequest {
+  title: string;
+  body: string;
+  internal: boolean;
+}
+
+export interface UnitFileNote {
+  id?: string;
+  unitId?: string;
+  title?: string;
+  body?: string;
+  internal?: boolean;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UnitFileView {
+  unit?: PropertyUnit;
+  relations?: UnitRelation[];
+  vehicles?: Vehicle[];
+  pets?: Pet[];
+  documents?: Document[];
+  notes?: UnitFileNote[];
 }

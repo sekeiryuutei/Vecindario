@@ -3,9 +3,10 @@
 Plataforma SaaS multi-copropiedad para portería, cartera, convivencia y administración. Nombre y empresa visibles se
 configuran con `APP_NAME` y `APP_COMPANY`; ningún texto de la interfaz los hardcodea.
 
-> **Estado: fases 1 a 6 completadas, más autogestión, nómina, WhatsApp y calidad automatizada.** Backend Spring Boot,
-> frontend Angular/Ionic/PWA, aplicación Capacitor para Android/iOS e infraestructura Docker implementados. La suite del
-> backend (157 unitarias + 51 de integración), la compilación del frontend y Playwright (10/10) se ejecutan sin errores.
+> **Estado: fases 1 a 6 completadas, más autogestión, nómina, WhatsApp, módulos comunitarios y calidad automatizada.**
+> Backend Spring Boot, frontend Angular/Ionic/PWA, aplicación Capacitor para Android/iOS e infraestructura Docker
+> implementados. La suite del backend (205 unitarias + 51 de integración), la compilación del frontend, Playwright
+> (17/17) y el smoke test de 30 secciones se ejecutan sin errores.
 
 ## Contenido
 
@@ -20,6 +21,10 @@ configuran con `APP_NAME` y `APP_COMPANY`; ningún texto de la interfaz los hard
 - Reservas de zonas comunes, PQRS con SLA, comunicados, notificaciones por correo y WhatsApp, registro de entregas,
   documentos con almacenamiento persistente, asambleas con quórum y votación ponderada.
 - Autogestión de datos de la copropiedad y canales; nómina parametrizable con aportes, provisiones, pago, anulación y CSV.
+- Comunidad y operación: junta directiva con cargos e historial, citas con la administración, capacitaciones con cupos e
+  inscripciones, directorio de personal operativo y expediente del inmueble con notas públicas o internas y documentos
+  asociados. La matriz de roles permite ajustar permisos por copropiedad, restablecer un permiso o un rol completo y
+  exportar el resultado en CSV.
 - WhatsApp Cloud API entrante con firma e idempotencia y respuestas asistidas con proveedores intercambiables y respaldo
   local; la interfaz no expone marcas ni proveedores.
 - Proveedores y contratos, mantenimiento, presupuesto, reportes CSV/PDF y cámaras LPR desacopladas.
@@ -121,12 +126,12 @@ del escáner QR ya declara permisos en `AndroidManifest.xml` e `Info.plist`.
 
 ```bash
 cd backend
-mvn -B test             # 157 pruebas unitarias, sin Docker
+mvn -B test             # 205 pruebas unitarias, sin Docker
 mvn -B verify           # 51 IT con PostgreSQL real + JaCoCo (requiere Docker)
 ```
 
-El frontend se valida con `npm run build` y Playwright (10 flujos de los cuatro portales). El smoke test integral del
-backend se ejecuta con el sistema levantado y seed activo:
+El frontend se valida con `npm run build` y Playwright (17 flujos de los cuatro portales, incluida la verificación
+responsive de los módulos nuevos). El smoke test integral del backend se ejecuta con el sistema levantado y seed activo:
 
 ```bash
 cd frontend
@@ -138,9 +143,10 @@ E2E_BASE_URL=http://localhost:48124 E2E_PASSWORD='Demo#2026!' npm run test:e2e
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-El smoke cubre 24 secciones: salud, autenticación multi-copropiedad, aislamiento, portería, visitantes, cartera,
+El smoke cubre 30 secciones: salud, autenticación multi-copropiedad, aislamiento, portería, visitantes, cartera,
 conciliación, Wompi, certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento,
-presupuesto, reportes, autogestión, nómina, WhatsApp y mascotas.
+presupuesto, reportes, autogestión, nómina, WhatsApp, mascotas, junta directiva, citas, capacitaciones, personal
+operativo, expediente del inmueble y matriz de roles y permisos.
 
 ## Producción
 

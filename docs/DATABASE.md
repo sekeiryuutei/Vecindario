@@ -75,4 +75,21 @@ Dinero siempre NUMERIC/BigDecimal. Global V5 agrega el permiso `FINANCE_VIEW_OWN
   - Índices: `ix_pets_unit` para consultas por inmueble y `ux_pets_microchip` (único, parcial) para evitar duplicados.
 - Global `public` (V16): permisos `PETS_VIEW`, `PETS_CREATE`, `PETS_UPDATE` y `PETS_DELETE` para administración/portería; `PETS_VIEW_OWN` y `PETS_MANAGE_OWN` para propietarios, arrendatarios y residentes.
 
+## Comunidad y operación (migraciones V12–V16 tenant, V17 global)
+- Tenant `{s}` (V12): `board_members` enlaza una persona con un cargo (`PRESIDENTE`, `VICEPRESIDENTE`, `SECRETARIO`,
+  `TESORERO`, `VOCAL`, `REVISOR_FISCAL`). Índices únicos parciales impiden dos cargos activos para la misma persona y dos
+  ocupantes del mismo cargo, salvo `VOCAL`; el borrado lógico conserva el historial.
+- Tenant `{s}` (V13): `appointments` registra la cita de un inmueble/persona con fecha, duración, modalidad
+  (`IN_PERSON`, `VIRTUAL`, `PHONE`), estado (`REQUESTED`, `CONFIRMED`, `COMPLETED`, `CANCELLED`, `NO_SHOW`) y notas de
+  administración. El índice único parcial `ux_appointments_slot` bloquea dos citas activas en la misma franja.
+- Tenant `{s}` (V14): `training_sessions` (capacidad, modalidad, estado, fechas) y `training_enrollments` (única por
+  sesión/persona, estados `ENROLLED`, `ATTENDED`, `ABSENT`, `CANCELLED`). La capacidad no puede bajar de los inscritos y
+  el borrado de una sesión exige que no tenga inscripciones activas.
+- Tenant `{s}` (V15): `staff_members` es el directorio operativo independiente de la nómina; documento único entre
+  registros activos, fechas de ingreso/retiro y borrado lógico.
+- Tenant `{s}` (V16): agrega `documents.unit_id` para asociar documentos a un inmueble y crea `unit_file_notes` con
+  `internal` para separar notas privadas de las visibles al residente.
+- Global `public` (V17): agrega 15 permisos de comunidad (`BOARD_*`, `APPOINTMENTS_*`, `TRAININGS_*`, `STAFF_*` y
+  `UNIT_FILE_*`) y los asigna a los roles base; el catálogo queda en 97 permisos.
+
 

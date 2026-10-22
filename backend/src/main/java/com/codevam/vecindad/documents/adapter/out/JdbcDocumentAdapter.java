@@ -18,7 +18,7 @@ import java.util.UUID;
 public class JdbcDocumentAdapter implements DocumentPort {
 
     private static final String COLS = """
-            id, title, description, category, storage_key, file_name, file_size,
+            id, title, description, category, unit_id, storage_key, file_name, file_size,
             content_type, minimum_role, uploaded_by, is_active, created_at, updated_at
             """;
 
@@ -27,6 +27,7 @@ public class JdbcDocumentAdapter implements DocumentPort {
             rs.getString("title"),
             rs.getString("description"),
             DocumentCategory.valueOf(rs.getString("category")),
+            Jdbc.uuid(rs, "unit_id"),
             rs.getString("storage_key"),
             rs.getString("file_name"),
             rs.getLong("file_size"),
@@ -49,12 +50,12 @@ public class JdbcDocumentAdapter implements DocumentPort {
         UUID id = d.id() == null ? UUID.randomUUID() : d.id();
         String sql = """
                 INSERT INTO {s}.documents (
-                    id, title, description, category, storage_key, file_name, file_size,
+                    id, title, description, category, unit_id, storage_key, file_name, file_size,
                     content_type, minimum_role, uploaded_by, is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         t.jdbc().update(t.q(sql),
-                id, d.title(), d.description(), d.category().name(), d.storageKey(),
+                id, d.title(), d.description(), d.category().name(), d.unitId(), d.storageKey(),
                 d.fileName(), d.fileSize(), d.contentType(), d.minimumRole(),
                 d.uploadedBy(), d.isActive());
         return findById(id).orElseThrow();
@@ -82,7 +83,8 @@ public class JdbcDocumentAdapter implements DocumentPort {
             return List.of();
         }
         String inPlaceholders = String.join(",", Collections.nCopies(allowedRoles.size(), "?"));
-        String sql = "SELECT " + COLS + " FROM {s}.documents WHERE is_active = true AND minimum_role IN (" + inPlaceholders + ")"
+        String sql = "SELECT " + COLS + " FROM {s}.documents WHERE is_active = true AND unit_id IS NULL "
+                + "AND minimum_role IN (" + inPlaceholders + ")"
                 + (category != null ? " AND category = ?" : "")
                 + " ORDER BY created_at DESC";
 
@@ -90,6 +92,30 @@ public class JdbcDocumentAdapter implements DocumentPort {
         if (category != null) {
             args.add(category.name());
         }
+        return t.jdbc().query(t.q(sql), MAPPER, args.toArray());
+    }
+
+    @Override
+    public List<Document> listByUnit(UUID unitId, DocumentCategory category) {
+        String sql = "SELECT " + COLS + " FROM {s}.documents WHERE is_active = true AND unit_id = ?"
+                + (category != null ? " AND category = ?" : "")
+                + " ORDER BY created_at DESC";
+        return category != null
+                ? t.jdbc().query(t.q(sql), MAPPER, unitId, category.name())
+                : t.jdbc().query(t.q(sql), MAPPER, unitId);
+    }
+
+    @Override
+    public List<Document> listVisibleForRoleByUnit(List<String> allowedRoles, UUID unitId) {
+        if (allowedRoles.isEmpty()) {
+            return List.of();
+        }
+        String inPlaceholders = String.join(",", Collections.nCopies(allowedRoles.size(), "?"));
+        String sql = "SELECT " + COLS + " FROM {s}.documents WHERE is_active = true AND unit_id = ? "
+                + "AND minimum_role IN (" + inPlaceholders + ") ORDER BY created_at DESC";
+        List<Object> args = new ArrayList<>();
+        args.add(unitId);
+        args.addAll(allowedRoles);
         return t.jdbc().query(t.q(sql), MAPPER, args.toArray());
     }
 

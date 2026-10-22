@@ -13,7 +13,7 @@ Swagger UI: `/swagger-ui.html` · OpenAPI JSON: `/v3/api-docs`. Paginación: `?p
 | GET `/public/manifest.webmanifest` | pública (manifest PWA con `APP_NAME`) |
 | GET/PUT `/tenants/current` · PUT `/tenants/current/features/{feature}` | miembro / TENANT_SETTINGS_MANAGE (solo canales autogestionables) |
 | GET/POST `/tenant-members` · PATCH `/tenant-members/{id}/role` · POST `…/suspend`, `…/activate` · DELETE `…/{id}` · GET `…/{id}/history` | USERS_VIEW / USERS_MANAGE |
-| GET `/roles`, `/roles/permissions` · PUT `/roles/{rol}/permissions/{perm}` | ROLES_MANAGE |
+| GET `/roles`, `/roles/permissions` · PUT `/roles/{rol}/permissions/{perm}` · DELETE `/roles/{rol}/permissions/{perm}` · DELETE `/roles/{rol}/permissions` | ROLES_MANAGE |
 | GET/POST `/properties` · GET/PUT/DELETE `/properties/{id}` | PROPERTIES_* |
 | GET `/audit` | AUDIT_VIEW (tenant del token) |
 | POST/GET `/platform/companies` · POST/GET `/platform/tenants` · PATCH `/platform/tenants/{id}/status` · POST `/platform/tenants/{id}/members` · GET `/platform/audit` | SUPER_ADMIN_PLATFORM |
@@ -21,6 +21,11 @@ Swagger UI: `/swagger-ui.html` · OpenAPI JSON: `/v3/api-docs`. Paginación: `?p
 Códigos de error frecuentes: `INVALID_CREDENTIALS` 401, `ACCOUNT_LOCKED` 423, `TENANT_ACCESS_DENIED` 403,
 `TENANT_ACCESS_REVOKED` 403, `TENANT_NOT_SELECTED` 400, `FORBIDDEN` 403, `RESOURCE_NOT_FOUND` 404,
 `VALIDATION_ERROR` 400, `WEAK_PASSWORD` 400, `TOO_MANY_REQUESTS` 429.
+
+La matriz de roles devuelve, por rol, los permisos efectivos y los valores base de la plataforma. `PUT` con
+`{"granted": false}` crea una excepción para la copropiedad; `DELETE /roles/{rol}/permissions/{perm}` elimina esa
+excepción y `DELETE /roles/{rol}/permissions` restablece el rol completo a los valores base. El rol `ADMINISTRADOR` es
+inmutable y responde 409 si se intenta restablecer.
 
 ## Fase 2a
 | Método y ruta | Permiso |
@@ -114,9 +119,9 @@ Códigos: `AMOUNT_TOO_LOW` 400 (mínimo Wompi), `INVALID_SIGNATURE` 400/401, `ON
 | GET/PUT `/notifications/settings` | NOTIFICATIONS_MANAGE |
 | POST `/notifications/portfolio-reminders` | NOTIFICATIONS_MANAGE |
 | GET `/notifications/logs` | NOTIFICATIONS_MANAGE |
-| POST `/documents` (multipart: file, title, category, minimumRole) | DOCUMENTS_MANAGE |
-| GET `/documents` · DELETE `/documents/{id}` | DOCUMENTS_MANAGE |
-| GET `/my/documents` · GET `/my/documents/{id}/download` | DOCUMENTS_VIEW |
+| POST `/documents` (multipart: file, title, category, minimumRole, unitId opcional) | DOCUMENTS_MANAGE |
+| GET `/documents?category=&unitId=` · GET `/documents/{id}/download` · DELETE `/documents/{id}` | DOCUMENTS_MANAGE |
+| GET `/my/documents` · GET `/my/documents/{id}/download` | DOCUMENTS_VIEW (documentos generales filtrados por rol; los del inmueble se consultan y descargan desde el expediente propio) |
 | POST/GET `/assemblies` · GET/PATCH `/assemblies/{id}/status` | ASSEMBLIES_MANAGE / ASSEMBLIES_VIEW |
 | POST `/assemblies/{id}/check-in` · GET `/assemblies/{id}/quorum` | ASSEMBLIES_MANAGE / ASSEMBLIES_VIEW |
 | POST `/assemblies/{id}/topics` · GET `/assemblies/{id}/topics` | ASSEMBLIES_MANAGE / ASSEMBLIES_VIEW |
@@ -182,6 +187,45 @@ Las integraciones por copropiedad guardan las credenciales de Wompi y del provee
 (`INTEGRATIONS_ENCRYPTION_KEY`); la API nunca devuelve llaves privadas ni secretos. La llave pública de Wompi sí se
 muestra porque viaja en la URL de checkout. Si la copropiedad no tiene configuración propia se usan los valores
 globales del entorno, de modo que una instalación existente sigue funcionando sin cambios.
+
+## Comunidad y operación
+| Método y ruta | Permiso / Auth |
+|---|---|
+| GET `/board?status=` · POST `/board` · PUT/DELETE `/board/{id}` | BOARD_VIEW / BOARD_MANAGE |
+| GET `/appointments?status=&from=&to=&q=&page=&size=` · PUT/DELETE `/appointments/{id}` | APPOINTMENTS_VIEW / APPOINTMENTS_MANAGE |
+| GET `/my/appointments` · POST `/my/appointments` · POST `/my/appointments/{id}/cancel` | APPOINTMENTS_VIEW_OWN / APPOINTMENTS_REQUEST |
+| GET `/trainings?status=&from=&page=&size=` · POST `/trainings` · PUT/DELETE `/trainings/{id}` · POST `/trainings/{id}/cancel` | TRAININGS_VIEW / TRAININGS_MANAGE |
+| GET `/trainings/{id}/enrollments` · PUT `/trainings/enrollments/{id}` | TRAININGS_MANAGE |
+| GET `/my/trainings` · POST/DELETE `/my/trainings/{id}/enroll` | TRAININGS_VIEW_OWN / TRAININGS_ENROLL_OWN |
+| GET `/staff?q=&status=&page=&size=` · POST `/staff` · PUT/DELETE `/staff/{id}` | STAFF_VIEW / STAFF_MANAGE |
+| GET `/properties/{unitId}/file` · POST `/properties/{unitId}/notes` · PUT/DELETE `/properties/{unitId}/notes/{id}` | UNIT_FILE_VIEW / UNIT_FILE_MANAGE |
+| GET `/my/units/{unitId}/file` | UNIT_FILE_VIEW_OWN |
+
+**Junta directiva:** los cargos son `PRESIDENTE`, `VICEPRESIDENTE`, `SECRETARIO`, `TESORERO`, `VOCAL` y `REVISOR_FISCAL`.
+Una persona solo puede tener un cargo activo y cada cargo distinto de `VOCAL` solo puede estar ocupado una vez; se permiten
+varios vocales. El borrado es lógico y conserva el historial. Conflictos: `BOARD_PERSON_ALREADY_ACTIVE`,
+`BOARD_POSITION_ALREADY_FILLED` y `BOARD_MEMBER_CONFLICT`.
+
+**Citas:** el residente solicita una cita para uno de sus inmuebles. El horario es lunes a viernes de 08:00 a 17:00
+(hora de Bogotá), con mínimo 2 horas de anticipación y máximo 60 días hacia adelante; la duración va de 15 a 120 minutos
+(30 por defecto). Solo puede existir una cita `REQUESTED` o `CONFIRMED` por franja horaria. La administración actualiza
+estado y notas; el residente cancela las propias. Errores: `APPOINTMENT_OUTSIDE_HOURS`, `APPOINTMENT_TOO_SOON`,
+`APPOINTMENT_TOO_FAR`, `APPOINTMENT_SLOT_TAKEN`, `APPOINTMENT_NOT_CANCELLABLE`, `APPOINTMENT_UNIT_FORBIDDEN`.
+
+**Capacitaciones:** modalidades `IN_PERSON`, `VIRTUAL` y `HYBRID`; estados `SCHEDULED`, `CANCELLED` y `COMPLETED`.
+La capacidad es de 1 a 500 y no puede reducirse por debajo del número de inscritos. Las inscripciones usan
+`ENROLLED`, `ATTENDED`, `ABSENT` y `CANCELLED`; una persona no puede inscribirse dos veces a la misma sesión. Una sesión
+solo se elimina si no tiene inscripciones `ENROLLED` o `ATTENDED`; las canceladas sí se pueden eliminar. Errores:
+`TRAINING_FULL`, `TRAINING_ALREADY_ENROLLED`, `TRAINING_ALREADY_STARTED`, `TRAINING_CAPACITY_BELOW_ENROLLED`,
+`TRAINING_HAS_ACTIVE_ENROLLMENTS`, `TRAINING_NOT_DELETABLE`.
+
+**Personal operativo:** directorio independiente de la nómina. Documento único entre registros activos, cargo obligatorio,
+fechas de ingreso/retiro coherentes y borrado lógico. Conflictos: `STAFF_DOCUMENT_EXISTS`, `STAFF_DATES_INVALID`.
+
+**Expediente del inmueble:** devuelve inmueble, relaciones, vehículos, mascotas, documentos y notas. Las notas son
+`internal=true` (solo administración) o públicas (visibles para el residente). El residente solo consulta inmuebles
+propios; sus documentos se filtran por rol y por `unitId`. Errores: `UNIT_FILE_FORBIDDEN`,
+`UNIT_FILE_NOTE_TITLE_REQUIRED`, `UNIT_FILE_NOTE_BODY_REQUIRED`.
 
 ## Mascotas
 | Método y ruta | Permiso / Auth |

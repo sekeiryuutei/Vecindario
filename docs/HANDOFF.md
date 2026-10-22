@@ -1,5 +1,5 @@
 # VECINDAD — Documento Maestro de Traspaso (Handoff)
-**Estado actual: fases 1–6, autogestión, nómina, WhatsApp y calidad automatizada**
+**Estado actual: fases 1–6, autogestión, nómina, WhatsApp, módulos comunitarios y calidad automatizada**
 
 Plataforma SaaS multi-tenant empresarial de administración integral de copropiedades residenciales en Colombia.
 - **Marca:** `APP_NAME` (por defecto: **Vecindad**)
@@ -17,8 +17,8 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 - **Arquitectura:** Hexagonal / Puertos y Adaptadores por módulo (`domain`, `application`, `port/in`, `port/out`, `adapter/in/web`, `adapter/out/persistence`).
 - **Persistencia y Aislamiento:** PostgreSQL 16 con estrategia **Schema-per-Tenant** (un esquema independiente por copropiedad: `tenant_demo_norte`, `tenant_demo_sur`, etc. y esquema global `public`).
 - **Migraciones de BD:** Flyway automatizado:
-  - Migraciones globales: `src/main/resources/db/migration/global` (hasta `V12__whatsapp_inbound.sql`).
-  - Migraciones por tenant: `src/main/resources/db/migration/tenant` (hasta `V9__payroll.sql`).
+  - Migraciones globales: `src/main/resources/db/migration/global` (hasta `V17__community_permissions.sql`).
+  - Migraciones por tenant: `src/main/resources/db/migration/tenant` (hasta `V16__unit_files.sql`).
   - `TenantMigrationRunner`: Aplica migraciones dinámicamente a todos los esquemas de copropiedad al arrancar o al aprovisionar un nuevo tenant.
 - **Seguridad y Multi-tenancy:**
   - Stateless JWT con firma HMAC-SHA256, rotación de refresh tokens en base de datos.
@@ -50,11 +50,12 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 | **Fase 3b** | Conciliación bancaria: Importación asíncrona de extractos CSV/XLSX, Perfiles por entidad bancaria, Motor de matching heurístico con puntajes y umbrales, Identidad estable por hash (`tx_hash`), Revisión manual, Reversión de conciliación. | **Completada** | Tests unitarios + Smoke tests |
 | **Fase 3c** | Pasarela de pagos Wompi: Intenciones de pago, Webhook con validación criptográfica de firma SHA-256 e idempotencia, Feature flag `ONLINE_PAYMENTS`. Certificados digitales PDF (Paz y Salvo, Estado de Cuenta, Propiedad) con código QR y verificación pública hash. | **Completada** | Tests unitarios + Smoke tests |
 | **Fase 4** | Zonas comunes y reservas con validación de horarios y bloqueo automático por mora, PQRS y convivencia con SLA estricto (24h para ruido / Código de Policía Ley 1801) y notas privadas, Comunicados segmentados con acuse de lectura, Notificaciones multicanal (Email, Push, WhatsApp), Repositorio documental con permisos por rol y `StoragePort`, Asambleas generales ordinarias/extraordinarias con quórum dinámico y votación ponderada por coeficientes (Ley 675). | **Completada** | Tests unitarios + Smoke tests |
-| **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **118 unitarias + 51 IT, smoke integral OK** |
-| **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build`, Playwright 5/5 y Docker build multi-stage OK** |
+| **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **Incluida en la suite actual (205 unitarias + 51 IT)** |
+| **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build`, Playwright 17/17 y Docker build multi-stage OK** |
 | **Autogestión y nómina** | Edición de datos de la copropiedad y activación de canales autogestionables (`WHATSAPP`, `CAMERAS`, `LPR`, `ASSEMBLIES`); pagos en línea sigue siendo una decisión de plataforma. Nómina por copropiedad con parámetros, empleados, periodos, cálculo de aportes/provisiones, pago, anulación y exportación CSV. | **Completada** | **Pruebas unitarias, smoke y flujo API/UI verificados** |
-| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 10/10; cobertura 53,17% de líneas** |
-| **Reservas, pagos, integraciones y mascotas** | Términos de uso y ventanas de aprobación por zona común, reservas con pago previo (`PENDING_PAYMENT`) facturadas con Wompi, panel general multi-copropiedad (`/my/tenant-overview`), credenciales de Wompi/IA cifradas (AES-GCM) administradas por copropiedad desde el área de plataforma y registro de mascotas por inmueble con vacunación y microchip único. | **Completada** | **157 unitarias + 51 IT, smoke de 24 secciones OK, E2E 10/10** |
+| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 17/17; cobertura 52,49% de líneas** |
+| **Reservas, pagos, integraciones y mascotas** | Términos de uso y ventanas de aprobación por zona común, reservas con pago previo (`PENDING_PAYMENT`) facturadas con Wompi, panel general multi-copropiedad (`/my/tenant-overview`), credenciales de Wompi/IA cifradas (AES-GCM) administradas por copropiedad desde el área de plataforma y registro de mascotas por inmueble con vacunación y microchip único. | **Completada** | **205 unitarias + 51 IT, smoke de 30 secciones OK, E2E 17/17** |
+| **Comunidad y operación** | Junta directiva con cargos e historial, citas de residentes con agenda y reglas de horario, capacitaciones con cupos, inscripciones y asistencia, directorio de personal operativo y expediente del inmueble con notas públicas/internas y documentos asociados. Matriz de roles con restablecimiento por permiso o por rol y exportación CSV. | **Completada** | **205 unitarias + 51 IT, smoke de 30 secciones OK, E2E 17/17 y revisión responsive** |
 
 ---
 
@@ -72,6 +73,9 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `PUT /tenants/current`: Edición de datos básicos por el administrador de la copropiedad.
 - `PUT /tenants/current/features/{feature}`: Activación de `WHATSAPP`, `CAMERAS`, `LPR` y `ASSEMBLIES`; `ONLINE_PAYMENTS` se administra desde plataforma.
 - `GET /audit`: Registro inmutable de auditoría del tenant.
+- `GET /roles`, `GET /roles/permissions`, `PUT /roles/{rol}/permissions/{perm}`: matriz de permisos efectivos.
+- `DELETE /roles/{rol}/permissions/{perm}` y `DELETE /roles/{rol}/permissions`: restablecen un permiso o el rol completo
+  a los valores base de la plataforma; `ADMINISTRADOR` no se puede restablecer.
 - `GET/POST /platform/companies`, `GET/POST /platform/tenants`: Gestión de nivel Super Admin.
 - `GET /my/tenant-overview`: Resumen de todas las copropiedades asignadas (rol, permisos y métricas) para el panel general.
 - `GET/PUT/DELETE /platform/tenants/{tenantId}/integrations[/wompi|/ai]`: Credenciales de Wompi y del proveedor de IA por
@@ -121,7 +125,8 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `POST/GET /my/pqrs`, `GET /pqrs`, `POST /pqrs/{id}/messages` (soporta `isInternal`), `GET /pqrs/metrics/sla`
 - `POST/GET /communications`, `PATCH /communications/{id}/publish`, `GET /my/communications`
 - `GET/PUT /notifications/settings`, `POST /notifications/portfolio-reminders`, `GET /notifications/logs`
-- `POST /documents`, `GET /documents`, `GET /my/documents`, `GET /my/documents/{id}/download`
+- `POST /documents` (con `unitId` opcional), `GET /documents?category=&unitId=`, `GET /documents/{id}/download`,
+  `GET /my/documents`, `GET /my/documents/{id}/download`
 - `POST/GET /assemblies`, `POST /assemblies/{id}/check-in`, `GET /assemblies/{id}/quorum`
 - `POST/GET /assemblies/{id}/topics`, `POST /assemblies/topics/{id}/open-vote`, `POST /assemblies/topics/{id}/close-vote`
 - `POST /my/assemblies/topics/{id}/vote` (ponderado por coeficiente de copropiedad según Ley 675).
@@ -153,6 +158,23 @@ Todos los endpoints responden en `http://localhost:48124/api/v1` (o a través de
 - `GET /cameras/status`: Estado de operatividad de cámaras LPR.
 - `POST /cameras/detect`: Detección y verificación de placas vehiculares autorizadas vs. visitantes.
 
+### Comunidad y operación
+- `GET /board?status=`, `POST /board`, `PUT/DELETE /board/{id}`: junta directiva; una persona solo puede tener un cargo
+  activo y los cargos distintos de `VOCAL` son únicos.
+- `GET /appointments?status=&from=&to=&q=`, `PUT/DELETE /appointments/{id}`: agenda administrativa y cierre de citas.
+- `GET /my/appointments`, `POST /my/appointments`, `POST /my/appointments/{id}/cancel`: citas del residente. Horario de
+  lunes a viernes 08:00–17:00 (Bogotá), mínimo 2 horas de anticipación, máximo 60 días y franja única activa.
+- `GET /trainings?status=&from=`, `POST /trainings`, `PUT/DELETE /trainings/{id}`, `POST /trainings/{id}/cancel`:
+  capacitaciones con cupos y estados `SCHEDULED`, `CANCELLED` y `COMPLETED`.
+- `GET /trainings/{id}/enrollments`, `PUT /trainings/enrollments/{id}`: inscripciones y asistencia.
+- `GET /my/trainings`, `POST/DELETE /my/trainings/{id}/enroll`: inscripción y cancelación propia.
+- `GET /staff?q=&status=`, `POST /staff`, `PUT/DELETE /staff/{id}`: directorio de personal operativo, independiente de la
+  nómina.
+- `GET /properties/{unitId}/file`, `POST /properties/{unitId}/notes`,
+  `PUT/DELETE /properties/{unitId}/notes/{id}`: expediente del inmueble con relaciones, vehículos, mascotas, documentos y
+  notas internas o públicas.
+- `GET /my/units/{unitId}/file`: expediente propio del residente, limitado a notas públicas y documentos visibles por rol.
+
 ---
 
 ## 4. Cómo Correr y Verificar el Sistema
@@ -171,7 +193,7 @@ docker logs vecindad_backend --tail 50
 # 4. Ejecutar pruebas unitarias, integración y cobertura
 cd backend
 mvn -B verify
-# Resultado esperado: 157 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
+# Resultado esperado: 205 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas (52,49% actual)
 cd ..
 
 # 5. Compilar el frontend y ejecutar Playwright
@@ -184,9 +206,9 @@ $env:E2E_PASSWORD='Demo#2026!'
 npm run test:e2e
 cd ..
 
-# 6. Smoke test integral (24 secciones)
+# 6. Smoke test integral (30 secciones)
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
-# Resultado esperado: build sin errores, Playwright 10/10 y mensaje final "TODO OK"
+# Resultado esperado: build sin errores, Playwright 17/17 y mensaje final "TODO OK"
 ```
 
 ### 4.2 Credenciales de Demostración
@@ -229,7 +251,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 8. **Wompi:** el monto mínimo en línea es `$1.500 COP` (mínimo de la pasarela); el redirect debe ser HTTPS público y los secretos de integridad y de eventos deben ser distintos. El webhook se firma y se procesa con idempotencia.
 
-9. **Calidad:** Playwright cubre los flujos críticos de administración, residente, portería y plataforma; JaCoCo se ejecuta en `verify` con umbral mínimo de 45% de líneas. El smoke test cubre 24 secciones, incluidas autogestión, nómina, WhatsApp y mascotas.
+9. **Calidad:** Playwright cubre 17 flujos críticos de administración, residente, portería y plataforma, incluida la
+   verificación responsive de los módulos comunitarios. JaCoCo se ejecuta en `verify` con umbral mínimo de 45% de líneas
+   (52,49% actual). El smoke test cubre 30 secciones, incluidas autogestión, nómina, WhatsApp, mascotas, junta directiva,
+   citas, capacitaciones, personal operativo, expediente del inmueble y matriz de roles.
 
 ---
 
@@ -248,18 +273,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
     `/pagos/wompi/resultado`.
   - Administración: dashboard, inmuebles, personas, vehículos, cartera, pagos, conciliación, certificados, reservas,
     PQRS, comunicados, notificaciones, documentos, asambleas, proveedores, mantenimiento, presupuesto, reportes,
-    nómina, auditoría, usuarios, roles y configuración. La barra superior incluye “Cambiar copropiedad” cuando el
-    usuario tiene más de un tenant.
-  - Portería: control de acceso, visitantes con escáner QR, paquetería y novedades.
+    nómina, junta directiva, citas, capacitaciones, personal operativo, expedientes, auditoría, usuarios, roles y
+    configuración. La barra superior incluye “Cambiar copropiedad” cuando el usuario tiene más de un tenant.
+  - Portería: control de acceso, visitantes con escáner QR, paquetería, novedades y consulta del personal operativo.
   - Residente: inmuebles, vehículos, estado de cuenta, pagos Wompi, certificados, visitantes, reservas, PQRS,
-    comunicados, asambleas, documentos y paquetes.
+    comunicados, asambleas, documentos, paquetes, junta directiva, citas, capacitaciones y expediente del inmueble.
   - Plataforma: empresas, copropiedades, auditoría global y dashboard de superadmin.
 - **PWA y móvil:** manifest dinámico con `APP_NAME`, iconos 192/512/maskable, service worker con precarga de assets y
   navegación SPA; proyectos Android e iOS generados con Capacitor, permisos de cámara declarados, `runtime-config.json`
   para fijar la API absoluta de la app nativa y script de sincronización que toma `APP_NAME`/`APP_PUBLIC_URL`
   (`npm run cap:sync`, `cap:android`, `cap:ios`).
-- **Verificación:** `npm run build` finaliza sin errores ni warnings de plantillas; Playwright supera 5/5; `npm run cap:sync`
-  sincroniza Android/iOS con la API absoluta y el nombre de la app; el backend pasa 118 unitarias y 51 IT; la imagen
+- **Verificación:** `npm run build` finaliza sin errores ni warnings de plantillas; Playwright supera 17/17; `npm run cap:sync`
+  sincroniza Android/iOS con la API absoluta y el nombre de la app; el backend pasa 205 unitarias y 51 IT; la imagen
   Docker multi-stage del frontend se construye a partir de `docker/frontend/Dockerfile`.
 - **Operación:** el Nginx del frontend sirve `index.html`, `ngsw.json` y `ngsw-worker.js` sin caché, aplica CSP y
   cabeceras de seguridad, y usa fallback a `index.html` para rutas profundas.
@@ -268,11 +293,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 ## 7. Estado de entrega y pendientes externos
 
-**Verificado en el entorno local:** arranque Docker, migraciones, 157 unitarias, 51 IT, cobertura 53,17% de líneas,
-Playwright 10/10, smoke de 24 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
-webhook de WhatsApp firmado/idempotente, envío y recepción real de WhatsApp, pago Wompi aprobado en sandbox con webhook
-reconciliado, reservas con términos y aprobación previa, panel general multi-copropiedad, integraciones por copropiedad
-cifradas, desglose de comisión y tarifa por pago en línea y configuración productiva fail-closed.
+**Verificado en el entorno local:** arranque Docker, migraciones globales hasta V17 y por tenant hasta V16, 205 unitarias,
+51 IT, cobertura 52,49% de líneas, Playwright 17/17, smoke de 30 secciones, autogestión por API, nómina
+calculada/anulada/exportada, correo SMTP recibido, webhook de WhatsApp firmado/idempotente, pago Wompi aprobado en sandbox
+con webhook reconciliado, reservas con términos, aprobación nocturna y pago previo (`PENDING_PAYMENT` → webhook →
+`PENDING_APPROVAL`), panel general multi-copropiedad, integraciones por copropiedad cifradas, desglose de comisión y tarifa
+por pago en línea, junta directiva, citas, capacitaciones, personal operativo, expediente del inmueble con documentos
+aislados por inmueble, matriz de roles con restablecimiento y configuración productiva fail-closed.
 
 **Pendiente para producción (requiere decisiones o credenciales del propietario):**
 

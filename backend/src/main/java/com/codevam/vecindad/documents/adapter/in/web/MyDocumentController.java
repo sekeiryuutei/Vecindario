@@ -43,7 +43,7 @@ public class MyDocumentController {
     public ResponseEntity<byte[]> download(@PathVariable UUID id) {
         var user = CurrentUser.requireTenant();
         String role = user.roleCode() != null ? user.roleCode() : "RESIDENTE";
-        DocumentService.DocumentFile doc = service.download(id, role);
+        DocumentService.DocumentFile doc = service.downloadForUser(id, role, user.userId());
 
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         try {
