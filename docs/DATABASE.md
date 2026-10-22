@@ -69,4 +69,10 @@ Dinero siempre NUMERIC/BigDecimal. Global V5 agrega el permiso `FINANCE_VIEW_OWN
   - `budget_items`: rubros presupuestales codificados (INCOME / EXPENSE), montos presupuestados y acumulados de ejecución.
   - `budget_executions`: registros inmutables de ejecución de gasto/ingreso asociados a órdenes de trabajo, facturas y proveedores.
 
+## Mascotas (migración V11 tenant)
+- Tenant `{s}` (V11):
+  - `pets`: mascota asociada a `property_units`, especie (`PERRO`, `GATO`, `AVE`, `OTRO`), raza, color, fecha de nacimiento, peso, microchip único entre mascotas activas, vacunación y estado (`ACTIVE`, `INACTIVE`); borrado lógico con `deleted_at` y `deleted_by`.
+  - Índices: `ix_pets_unit` para consultas por inmueble y `ux_pets_microchip` (único, parcial) para evitar duplicados.
+- Global `public` (V16): permisos `PETS_VIEW`, `PETS_CREATE`, `PETS_UPDATE` y `PETS_DELETE` para administración/portería; `PETS_VIEW_OWN` y `PETS_MANAGE_OWN` para propietarios, arrendatarios y residentes.
+
 

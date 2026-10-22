@@ -32,6 +32,13 @@ export function today(): string {
   return toDateInput(new Date().toISOString());
 }
 
+export function vaccineState(vaccinated: boolean | null | undefined, expiresOn: string | null | undefined):
+  { label: string; tone: 'success' | 'danger' | 'neutral' } {
+  if (!vaccinated) return { label: 'Sin registrar', tone: 'neutral' };
+  if (!expiresOn) return { label: 'Al día', tone: 'success' };
+  return expiresOn < today() ? { label: 'Vencida', tone: 'danger' } : { label: 'Al día', tone: 'success' };
+}
+
 export function addDays(days: number, from = new Date()): string {
   const date = new Date(from);
   date.setDate(date.getDate() + days);

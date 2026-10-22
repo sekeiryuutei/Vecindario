@@ -183,5 +183,22 @@ Las integraciones por copropiedad guardan las credenciales de Wompi y del provee
 muestra porque viaja en la URL de checkout. Si la copropiedad no tiene configuración propia se usan los valores
 globales del entorno, de modo que una instalación existente sigue funcionando sin cambios.
 
+## Mascotas
+| Método y ruta | Permiso / Auth |
+|---|---|
+| GET `/pets` | PETS_VIEW (filtros `q`, `unitId`, `species`, `status`) |
+| GET `/pets/{id}` | PETS_VIEW |
+| POST `/pets` | PETS_CREATE |
+| PUT `/pets/{id}` | PETS_UPDATE |
+| DELETE `/pets/{id}` | PETS_DELETE (borrado lógico) |
+| GET `/my/pets` | PETS_VIEW_OWN (opcional `unitId`) |
+| POST `/my/pets` | PETS_MANAGE_OWN |
+| PUT `/my/pets/{id}` | PETS_MANAGE_OWN |
+| DELETE `/my/pets/{id}` | PETS_MANAGE_OWN |
+
+Cada mascota pertenece a un inmueble. `species` acepta `PERRO`, `GATO`, `AVE` u `OTRO`; el microchip es único entre
+mascotas activas. Si se registra `vaccineExpiresOn`, la mascota queda marcada como vacunada. Los residentes solo ven y
+gestionan mascotas de sus propios inmuebles; portería y administración pueden consultar el registro completo.
+
 
 

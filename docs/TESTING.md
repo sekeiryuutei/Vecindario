@@ -4,7 +4,7 @@
 
 ```bash
 cd backend
-mvn -B test         # 118 pruebas unitarias (sin Docker)
+mvn -B test         # 157 pruebas unitarias (sin Docker)
 mvn -B verify       # 51 IT con PostgreSQL real + JaCoCo (requiere Docker)
 
 cd ../frontend
@@ -20,9 +20,9 @@ Con el sistema levantado y seed activo:
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-El smoke test recorre 23 secciones: salud, login multi-copropiedad, aislamiento, portería, visitantes, cartera,
+El smoke test recorre 24 secciones: salud, login multi-copropiedad, aislamiento, portería, visitantes, cartera,
 conciliación, Wompi, certificados, reservas, PQRS, comunicados, documentos, asambleas, proveedores, mantenimiento,
-presupuesto, reportes, autogestión, nómina y WhatsApp.
+presupuesto, reportes, autogestión, nómina, WhatsApp y mascotas.
 La app nativa se sincroniza con `APP_PUBLIC_URL` HTTPS y `APP_NAME`:
 
 ```powershell
@@ -31,7 +31,7 @@ $env:APP_NAME='Mi Copropiedad'
 npm run cap:sync
 ```
 
-## Unitarias (118)
+## Unitarias (157)
 
 - `SchemaNamesTest`, `TenantContextTest`: saneamiento de identificadores y contexto de tenant.
 - `JwtServiceTest`: firma, expiración, llave ajena, secreto corto o de desarrollo en producción.
@@ -47,7 +47,7 @@ npm run cap:sync
 - `PaymentAllocatorTest`: orden configurable, abonos parciales, sobrante y 300 casos aleatorios.
 - `StatementRowMapperTest`, `MatchingEngineTest`: parseo de extractos y motor de conciliación.
 - `ReservationServiceTest`, `PqrServiceTest`, `AssemblyServiceTest`, `BudgetServiceTest`, `MaintenanceServiceTest`,
-  `SupplierServiceTest`, `ReportServiceTest`, `CameraServiceTest`, `CertificatePdfTest`.
+  `SupplierServiceTest`, `ReportServiceTest`, `CameraServiceTest`, `CertificatePdfTest`, `PetServiceTest`.
 - `PayrollServiceTest`: parámetros, novedades, aportes/provisiones, generación, recalculo, pago, anulación y numeración
   versionada al regenerar un periodo anulado.
 - `TenantAdminServiceTest`: edición de datos y límites de los canales autogestionables.
@@ -83,12 +83,13 @@ unitarias; sus flujos HTTP completos se validan en el smoke test.
 `APP_PUBLIC_URL=... APP_NAME=... npm run cap:sync` valida además la sincronización Android/iOS y escribe la API absoluta
 en `runtime-config.json`.
 
-Playwright cubre cinco flujos con `E2E_BASE_URL` (por defecto `http://localhost:48124`) y la contraseña demo:
-administrador, residente, portería y plataforma, incluido el cambio de copropiedad. En CI se ejecuta después de levantar
-Docker; localmente requiere el stack healthy y Chromium instalado. Los reportes quedan en `frontend/playwright-report/`.
+Playwright cubre diez flujos con `E2E_BASE_URL` (por defecto `http://localhost:48124`) y la contraseña demo:
+administrador, residente, portería y plataforma, incluido el cambio de copropiedad, el alta/baja de mascotas por
+administración y residente, y el alta de mascotas propias. En CI se ejecuta después de levantar Docker; localmente
+requiere el stack healthy y Chromium instalado. Los reportes quedan en `frontend/playwright-report/`.
 
 `mvn -B verify` genera `backend/target/site/jacoco/` y falla si la cobertura de líneas baja de 45%. La medición actual es
-53,57% de líneas, 42,84% de ramas y 58,66% de métodos.
+53,17% de líneas, 42,37% de ramas y 58,16% de métodos.
 
 ## Recorrido manual por pantalla
 

@@ -60,6 +60,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/admin/vehicles.page').then((m) => m.VehiclesPage)
       },
       {
+        path: 'mascotas',
+        canActivate: [permissionGuard('PETS_VIEW')],
+        loadComponent: () => import('./pages/admin/pets.page').then((m) => m.PetsPage)
+      },
+      {
         path: 'cartera',
         canActivate: [permissionGuard('FINANCE_VIEW')],
         loadComponent: () => import('./pages/admin/finance.page').then((m) => m.FinancePage)
@@ -197,6 +202,11 @@ export const routes: Routes = [
             path: 'vehiculos',
             canActivate: [permissionGuard('VEHICLES_VIEW_OWN')],
             loadComponent: () => import('./pages/resident/my-vehicles.page').then((m) => m.MyVehiclesPage)
+          },
+          {
+            path: 'mascotas',
+            canActivate: [permissionGuard('PETS_VIEW_OWN')],
+            loadComponent: () => import('./pages/resident/my-pets.page').then((m) => m.MyPetsPage)
           },
           {
             path: 'estado-cuenta',

@@ -21,6 +21,17 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ]
   },
   {
+    label: 'Mascotas',
+    permissions: [
+      { code: 'PETS_VIEW', label: 'Ver mascotas' },
+      { code: 'PETS_CREATE', label: 'Registrar mascotas' },
+      { code: 'PETS_UPDATE', label: 'Editar mascotas' },
+      { code: 'PETS_DELETE', label: 'Eliminar mascotas' },
+      { code: 'PETS_VIEW_OWN', label: 'Ver mascotas propias' },
+      { code: 'PETS_MANAGE_OWN', label: 'Gestionar mascotas propias' }
+    ]
+  },
+  {
     label: 'Vehículos y portería',
     permissions: [
       { code: 'VEHICLES_VIEW', label: 'Ver vehículos' },

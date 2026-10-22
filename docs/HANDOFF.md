@@ -53,8 +53,8 @@ Plataforma SaaS multi-tenant empresarial de administración integral de copropie
 | **Fase 5** | Catálogo de proveedores y contratistas con seguimiento de contratos y pólizas de seguro (`suppliers`), Mantenimiento preventivo y correctivo con activos, planes y órdenes de trabajo (`maintenance`), Presupuesto anual con rubros de ingresos/gastos y balance de ejecución en tiempo real (`budget`), Reportes consolidados de cartera y exportación en CSV y PDF (`reports`), Adaptador desacoplado de cámaras LPR (`camera`). | **Completada** | **118 unitarias + 51 IT, smoke integral OK** |
 | **Fase 6** | **Frontend Web, PWA y Móvil:** Angular 20 standalone, Ionic 8, Capacitor 8 (Android/iOS), PWA con service worker. Portales de administración, portería, residente y superadmin; páginas públicas de login, recuperación, selección de copropiedad, verificación de certificados y resultado Wompi; dashboards y navegación filtrados por permisos reales. | **Completada** | **`npm run build`, Playwright 5/5 y Docker build multi-stage OK** |
 | **Autogestión y nómina** | Edición de datos de la copropiedad y activación de canales autogestionables (`WHATSAPP`, `CAMERAS`, `LPR`, `ASSEMBLIES`); pagos en línea sigue siendo una decisión de plataforma. Nómina por copropiedad con parámetros, empleados, periodos, cálculo de aportes/provisiones, pago, anulación y exportación CSV. | **Completada** | **Pruebas unitarias, smoke y flujo API/UI verificados** |
-| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 8/8; cobertura 53,46% de líneas** |
-| **Reservas, pagos e integraciones** | Términos de uso y ventanas de aprobación por zona común, reservas con pago previo (`PENDING_PAYMENT`) facturadas con Wompi, panel general multi-copropiedad (`/my/tenant-overview`) y credenciales de Wompi/IA cifradas (AES-GCM) y administradas por copropiedad desde el área de plataforma. | **Completada** | **149 unitarias + 51 IT, smoke de 23 secciones OK, E2E 8/8** |
+| **WhatsApp y calidad** | Webhook entrante de WhatsApp Cloud API con firma e idempotencia, respuestas salientes, asistente con adaptadores intercambiables y respaldo local; correo SMTP real; Playwright para los cuatro portales; JaCoCo con umbral de 45% de líneas y CI/CD en GitHub Actions. | **Completada** | **Webhook GET/POST/duplicado/firma inválida OK; E2E 10/10; cobertura 53,17% de líneas** |
+| **Reservas, pagos, integraciones y mascotas** | Términos de uso y ventanas de aprobación por zona común, reservas con pago previo (`PENDING_PAYMENT`) facturadas con Wompi, panel general multi-copropiedad (`/my/tenant-overview`), credenciales de Wompi/IA cifradas (AES-GCM) administradas por copropiedad desde el área de plataforma y registro de mascotas por inmueble con vacunación y microchip único. | **Completada** | **157 unitarias + 51 IT, smoke de 24 secciones OK, E2E 10/10** |
 
 ---
 
@@ -171,7 +171,7 @@ docker logs vecindad_backend --tail 50
 # 4. Ejecutar pruebas unitarias, integración y cobertura
 cd backend
 mvn -B verify
-# Resultado esperado: 149 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
+# Resultado esperado: 157 unitarias + 51 IT, 0 fallos; JaCoCo >= 45% de líneas
 cd ..
 
 # 5. Compilar el frontend y ejecutar Playwright
@@ -184,9 +184,9 @@ $env:E2E_PASSWORD='Demo#2026!'
 npm run test:e2e
 cd ..
 
-# 6. Smoke test integral (23 secciones)
+# 6. Smoke test integral (24 secciones)
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
-# Resultado esperado: build sin errores, Playwright 8/8 y mensaje final "TODO OK"
+# Resultado esperado: build sin errores, Playwright 10/10 y mensaje final "TODO OK"
 ```
 
 ### 4.2 Credenciales de Demostración
@@ -229,7 +229,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 8. **Wompi:** el monto mínimo en línea es `$1.500 COP` (mínimo de la pasarela); el redirect debe ser HTTPS público y los secretos de integridad y de eventos deben ser distintos. El webhook se firma y se procesa con idempotencia.
 
-9. **Calidad:** Playwright cubre los flujos críticos de administración, residente, portería y plataforma; JaCoCo se ejecuta en `verify` con umbral mínimo de 45% de líneas. El smoke test cubre 23 secciones, incluidas autogestión, nómina y WhatsApp.
+9. **Calidad:** Playwright cubre los flujos críticos de administración, residente, portería y plataforma; JaCoCo se ejecuta en `verify` con umbral mínimo de 45% de líneas. El smoke test cubre 24 secciones, incluidas autogestión, nómina, WhatsApp y mascotas.
 
 ---
 
@@ -268,8 +268,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 ## 7. Estado de entrega y pendientes externos
 
-**Verificado en el entorno local:** arranque Docker, migraciones, 149 unitarias, 51 IT, cobertura 53,46% de líneas,
-Playwright 8/8, smoke de 23 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
+**Verificado en el entorno local:** arranque Docker, migraciones, 157 unitarias, 51 IT, cobertura 53,17% de líneas,
+Playwright 10/10, smoke de 24 secciones, autogestión por API, nómina calculada/anulada/exportada, correo SMTP recibido,
 webhook de WhatsApp firmado/idempotente, envío y recepción real de WhatsApp, pago Wompi aprobado en sandbox con webhook
 reconciliado, reservas con términos y aprobación previa, panel general multi-copropiedad, integraciones por copropiedad
 cifradas, desglose de comisión y tarifa por pago en línea y configuración productiva fail-closed.

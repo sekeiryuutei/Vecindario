@@ -130,6 +130,7 @@ export class ShellComponent {
       pushFiltered(porterSections, 'Operación de portería', [
         { label: 'Resumen', path: '/app/inicio', icon: 'homeOutline' },
         { label: 'Control de acceso', path: '/app/porteria/control', icon: 'carOutline', permissions: ['VEHICLES_VIEW'] },
+        { label: 'Mascotas', path: '/app/mascotas', icon: 'pawOutline', permissions: ['PETS_VIEW'] },
         { label: 'Visitantes', path: '/app/porteria/visitantes', icon: 'peopleOutline', permissions: ['VISITORS_VIEW'] },
         { label: 'Paquetería', path: '/app/porteria/paquetes', icon: 'cubeOutline', permissions: ['PACKAGES_VIEW'] },
         { label: 'Novedades', path: '/app/porteria/novedades', icon: 'alertCircleOutline', permissions: ['INCIDENTS_VIEW'] }
@@ -143,6 +144,7 @@ export class ShellComponent {
         { label: 'Resumen', path: '/app/inicio', icon: 'homeOutline' },
         { label: 'Mis inmuebles', path: '/app/residente/inmuebles', icon: 'businessOutline', permissions: ['UNITS_VIEW_OWN'] },
         { label: 'Mis vehículos', path: '/app/residente/vehiculos', icon: 'carOutline', permissions: ['VEHICLES_VIEW_OWN'] },
+        { label: 'Mis mascotas', path: '/app/residente/mascotas', icon: 'pawOutline', permissions: ['PETS_VIEW_OWN'] },
         { label: 'Estado de cuenta', path: '/app/residente/estado-cuenta', icon: 'walletOutline', permissions: ['FINANCE_VIEW_OWN'] },
         { label: 'Certificados', path: '/app/residente/certificados', icon: 'ribbonOutline', permissions: ['CERTIFICATES_VIEW_OWN'] }
       ], this.auth);
@@ -171,6 +173,7 @@ export class ShellComponent {
       { label: 'Inmuebles', path: '/app/propiedades', icon: 'businessOutline', permissions: ['PROPERTIES_VIEW'] },
       { label: 'Personas', path: '/app/personas', icon: 'peopleOutline', permissions: ['RESIDENTES_VIEW'] },
       { label: 'Vehículos', path: '/app/vehiculos', icon: 'carOutline', permissions: ['VEHICLES_VIEW'] },
+      { label: 'Mascotas', path: '/app/mascotas', icon: 'pawOutline', permissions: ['PETS_VIEW'] },
       { label: 'Reservas y zonas', path: '/app/reservas', icon: 'calendarOutline', permissions: ['RESERVATIONS_VIEW', 'COMMON_AREAS_MANAGE'] },
       { label: 'PQRS', path: '/app/pqrs', icon: 'chatbubblesOutline', permissions: ['PQR_VIEW'] },
       { label: 'Comunicados', path: '/app/comunicados', icon: 'megaphoneOutline', permissions: ['COMMUNICATIONS_VIEW', 'COMMUNICATIONS_MANAGE'] }

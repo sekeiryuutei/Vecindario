@@ -30,6 +30,43 @@ export interface WorkOrder {
   updatedAt?: string;
 }
 
+export type PetSpecies = "PERRO" | "GATO" | "AVE" | "OTRO";
+export type PetStatus = "ACTIVE" | "INACTIVE";
+
+export interface PetRequest {
+  name: string;
+  species?: PetSpecies;
+  breed?: string;
+  color?: string;
+  birthDate?: string;
+  weightKg?: number;
+  microchip?: string;
+  vaccinated?: boolean;
+  vaccineExpiresOn?: string;
+  notes?: string;
+  status?: PetStatus;
+  unitId?: string;
+}
+
+export interface Pet {
+  id?: string;
+  unitId?: string;
+  unitIdentifier?: string;
+  name?: string;
+  species?: PetSpecies;
+  breed?: string;
+  color?: string;
+  birthDate?: string;
+  weightKg?: number;
+  microchip?: string;
+  vaccinated?: boolean;
+  vaccineExpiresOn?: string;
+  notes?: string;
+  status?: PetStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface VehicleRequest {
   typeCode: string;
   plate?: string;
@@ -1310,6 +1347,14 @@ export interface PageResultVisit {
 
 export interface PageResultInvitation {
   content?: Invitation[];
+  page?: number;
+  size?: number;
+  totalElements?: number;
+  totalPages?: number;
+}
+
+export interface PageResultPet {
+  content?: Pet[];
   page?: number;
   size?: number;
   totalElements?: number;

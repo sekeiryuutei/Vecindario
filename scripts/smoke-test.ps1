@@ -661,4 +661,26 @@ if ($envMap['WHATSAPP_ENABLED'] -ne 'true') {
   }
 }
 
+Write-Host '24) Mascotas por inmueble'
+$petAdmin = Call POST '/pets' $admin @{ name = "Mascota Smoke $runId"; species = 'GATO'; unitId = $unit101; vaccinated = $true; vaccineExpiresOn = (Get-Date).AddMonths(6).ToString('yyyy-MM-dd'); microchip = "SMOKE$runId" }
+Check 'administrador registra mascota (201)' ($petAdmin.Status -eq 201 -and $petAdmin.Json.id)
+$petDup = Call POST '/pets' $admin @{ name = "Mascota Duplicada $runId"; species = 'PERRO'; unitId = $unit101; microchip = "SMOKE$runId" }
+Check 'microchip duplicado (409)' ($petDup.Status -eq 409 -and $petDup.Json.code -eq 'PET_MICROCHIP_ALREADY_REGISTERED')
+$petSearch = Call GET "/pets?q=SMOKE$runId" $admin
+Check 'busqueda de mascota por microchip' ($petSearch.Status -eq 200 -and $petSearch.Json.totalElements -eq 1)
+$petMine = Call GET "/my/pets?unitId=$unit101" $ot
+Check 'propietario ve la mascota de su inmueble' ($petMine.Status -eq 200 -and @($petMine.Json | Where-Object { $_.id -eq $petAdmin.Json.id }).Count -eq 1)
+$petResident = Call POST '/my/pets' $ot @{ name = "Mascota Residente $runId"; species = 'PERRO'; unitId = $unit101 }
+Check 'propietario registra mascota propia (201)' ($petResident.Status -eq 201 -and $petResident.Json.id)
+$surUnit = @((Call GET '/my/units' $ots).Json)[0].unitId
+$petForeign = Call POST '/my/pets' $ot @{ name = "Mascota Ajena $runId"; species = 'AVE'; unitId = $surUnit }
+Check 'propietario no registra en inmueble de otra copropiedad (404)' ($petForeign.Status -eq 404)
+Check 'portero consulta mascotas (200)' ((Call GET '/pets?size=5' $guard).Status -eq 200)
+Check 'portero no registra mascotas (403)' ((Call POST '/pets' $guard @{ name = 'No permitido'; species = 'OTRO'; unitId = $unit101 }).Status -eq 403)
+Check 'propietario no accede al registro administrativo (403)' ((Call GET '/pets' $ot).Status -eq 403)
+Check 'propietario elimina su mascota' ((Call DELETE "/my/pets/$($petResident.Json.id)" $ot).Status -eq 204)
+Check 'administrador elimina la mascota de prueba' ((Call DELETE "/pets/$($petAdmin.Json.id)" $admin).Status -eq 204)
+$petGone = Call GET "/pets?q=SMOKE$runId" $admin
+Check 'mascota eliminada no aparece en el registro' ($petGone.Status -eq 200 -and $petGone.Json.totalElements -eq 0)
+
 if ($fails -eq 0) { Write-Host 'TODO OK' -ForegroundColor Green } else { Write-Host "HAY $fails FALLOS" -ForegroundColor Red; exit 1 }

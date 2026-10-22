@@ -78,6 +78,10 @@ const LABELS: Record<string, string> = {
   JPG: 'Imagen JPG',
   PNG: 'Imagen PNG',
 
+  PERRO: 'Perro',
+  GATO: 'Gato',
+  AVE: 'Ave',
+
   APARTAMENTO: 'Apartamento',
   CASA: 'Casa',
   LOCAL: 'Local',
